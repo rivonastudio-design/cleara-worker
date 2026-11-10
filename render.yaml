@@ -1,0 +1,13 @@
+services:
+  - type: worker
+    name: cleara-worker
+    runtime: docker
+    plan: starter
+    region: singapore
+    envVars:
+      - key: SUPABASE_URL
+        value: https://ldwrggtyfdlyvrywovri.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: POLL_SECONDS
+        value: "5"
