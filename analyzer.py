@@ -104,8 +104,16 @@ def analyze(path, profile="offset_coated", opts=None):
             add("tac_high", "warning", pno, v=f"{tac_max:.0f}%", e=f"{o['max_tac']}%", key="tac")
 
         # fonts
+        try:
+            used_fonts = {sp["font"].split("+")[-1] for blk in page.get_text("dict")["blocks"]
+                          for ln in blk.get("lines", []) for sp in ln["spans"] if sp["text"].strip()}
+        except Exception:
+            used_fonts = None
         for f in page.get_fonts(full=True):
             name = f[3].split("+")[-1]
+            # a font listed in the page resources but never used to draw text is harmless
+            if used_fonts is not None and not any(name == u or name in u or u in name for u in used_fonts):
+                continue
             fonts_seen.add(name)
             if f[1] == "n/a" and f[2] != "Type3":
                 base14 = re.match(r"(Helvetica|Times|Courier|Symbol|ZapfDingbats|Arial)", name) is not None
