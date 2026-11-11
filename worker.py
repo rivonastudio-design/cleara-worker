@@ -1,7 +1,7 @@
 """Cleara worker: polls Supabase for queued jobs, analyzes PDFs, writes report back."""
 import os, sys, time, tempfile, traceback
 import requests
-from analyzer import analyze, analyze_image
+from engine import analyze_full, analyze_image, render_previews, image_preview
 
 def load_env():
     if os.path.exists(".env"):
@@ -26,6 +26,10 @@ class Sb:
         if not pid: return None
         r = requests.get(f"{self.url}/rest/v1/presets", headers=self.h, timeout=30, params={"id": f"eq.{pid}", "select": "*"})
         r.raise_for_status(); j = r.json(); return j[0] if j else None
+    def upload_preview(self, path, fn):
+        h = {**self.h, "Content-Type": "image/jpeg", "x-upsert": "true"}
+        r = requests.post(f"{self.url}/storage/v1/object/previews/{path}", headers=h, data=open(fn, "rb").read(), timeout=120)
+        r.raise_for_status()
     def update(self, jid, data):
         r = requests.patch(f"{self.url}/rest/v1/jobs", headers=self.h, timeout=30, params={"id": f"eq.{jid}"}, json=data)
         r.raise_for_status()
@@ -50,8 +54,18 @@ def process(sb, job):
                     "bleed_mm": float(pr["bleed_mm"]), "safe_mm": float(pr["safe_mm"])}
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, "in." + ft); sb.download(job["file_path"], p)
-            fn = analyze if ft == "pdf" else analyze_image
+            fn = analyze_full if ft == "pdf" else analyze_image
             res = fn(p, job.get("profile") or "offset_coated", opts)
+            try:
+                pv = render_previews(p, td) if ft == "pdf" else image_preview(p, td)
+                prev = []
+                for x in pv:
+                    path = f"{job['agency_id']}/{jid}/p{x['page']}.jpg"
+                    sb.upload_preview(path, x["file"])
+                    prev.append({"page": x["page"], "path": path, "w_pt": x["w_pt"], "h_pt": x["h_pt"], "px_w": x["px_w"], "px_h": x["px_h"]})
+                res["fact_sheet"]["previews"] = prev
+            except Exception as e:
+                print("preview skipped:", e)
         s = res["report"]["summary"]
         if res["corrupt"]:
             sb.update(jid, {"status": "failed", "result": "error", "report": res["report"],
