@@ -36,10 +36,12 @@ def _spelling(doc):
                 for sp in ln["spans"]:
                     for w in re.findall(r"[A-Za-z]{4,}", sp["text"]):
                         lw = w.lower()
-                        if w.isupper() or w[0].isupper() or lw in seen: continue
+                        if w.isupper() or lw in seen: continue
                         if _SPELL.known([lw]): continue
                         sug = _SPELL.correction(lw)
                         if not sug or sug == lw: continue
+                        # Capitalised words may be names: flag only a clear one-letter typo of a longer word
+                        if w[0].isupper() and (len(lw) < 6 or sug not in _SPELL.edit_distance_1(lw)): continue
                         seen.add(lw)
                         out.append(_finding("spelling", "confirm", pno, fitz.Rect(sp["bbox"]), w, sug))
                         if len(out) >= 8: return out

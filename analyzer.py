@@ -84,7 +84,17 @@ def analyze(path, profile="offset_coated", opts=None):
         try: cs = page.read_contents().decode("latin-1")
         except Exception: cs = ""
         if re.search(r"(?<![\w/])[\d.\-]+\s+[\d.\-]+\s+[\d.\-]+\s+(rg|RG)\b", cs):
-            add("rgb_color", "error" if offset else "warning", pno, v="vector/text", key="rgbv")
+            rgb_bb = None
+            try:
+                for d in page.get_drawings():
+                    f = d.get("fill") or d.get("color")
+                    if f and len(f) == 3 and not (abs(f[0]-f[1]) < 0.01 and abs(f[1]-f[2]) < 0.01):
+                        r = fitz.Rect(d["rect"])
+                        if r.width > 1 and r.height > 1 and r.get_area() < 0.85 * media.get_area() and (rgb_bb is None or r.get_area() > rgb_bb.get_area()):
+                            rgb_bb = r
+            except Exception:
+                rgb_bb = None
+            add("rgb_color", "error" if offset else "warning", pno, rgb_bb, "vector/text", key="rgbv")
         tac_max = 0
         for m in re.finditer(r"([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+(k|K)\b", cs):
             c, mg, y, k = (float(m.group(i)) for i in range(1, 5))
