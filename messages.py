@@ -75,6 +75,11 @@ M = {
  "hi": ("पेज साइज़ {v} है, {e} अपेक्षित।", "आर्टवर्क को चुने हुए साइज़ में बदलें।"),
  "gu": ("પેજ સાઇઝ {v} છે, {e} અપેક્ષિત.", "આર્ટવર્કને પસંદ કરેલા સાઇઝમાં બદલો."),
  "hinglish": ("Page size {v} hai, {e} expected tha.", "Artwork ko chuni hui size me badlo.")},
+"dark_image": {
+ "en": ("Photo is very dark ({v} of it is near-black). Dark photos print even darker and shadow detail is lost.", "Brighten the photo a little (lift the shadows 10-20%), convert to CMYK, and ask for a proof before the full run."),
+ "hi": ("फ़ोटो बहुत गहरी है ({v} हिस्सा लगभग काला है)। गहरी फ़ोटो प्रिंट में और ज़्यादा गहरी आती है और शैडो की डिटेल खो जाती है।", "फ़ोटो को थोड़ा हल्का करें (शैडो 10-20% उठाएँ), CMYK में बदलें और पूरा प्रिंट करने से पहले प्रूफ़ मँगवाएँ।"),
+ "gu": ("ફોટો ખૂબ ઘેરો છે ({v} ભાગ લગભગ કાળો છે). ઘેરો ફોટો પ્રિન્ટમાં વધુ ઘેરો આવે છે અને શેડોની ડિટેલ જતી રહે છે.", "ફોટો થોડો હળવો કરો (શેડો 10-20% ઉપર ઉઠાવો), CMYK માં બદલો અને પૂરું પ્રિન્ટ કરતા પહેલાં પ્રૂફ મંગાવો."),
+ "hinglish": ("Photo bahut dark hai ({v} hissa lagbhag kala hai). Dark photo print me aur dark aati hai aur shadow ki detail chali jaati hai.", "Photo ko thoda halka karo (shadow 10-20% uthao), CMYK me convert karo aur poora print karne se pehle proof mangwao.")},
 "corrupt": {
  "en": ("This file could not be opened. It may be corrupt or password-protected.", "Re-export the PDF and upload again. Your credits are refunded."),
  "hi": ("यह फ़ाइल खुल नहीं सकी। यह खराब या पासवर्ड वाली हो सकती है।", "PDF दोबारा एक्सपोर्ट करके अपलोड करें। आपके क्रेडिट वापस हो गए हैं।"),

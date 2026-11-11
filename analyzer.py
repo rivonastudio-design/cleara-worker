@@ -32,6 +32,7 @@ def analyze(path, profile="offset_coated", opts=None):
         add("corrupt", "error")
         return _pack(findings, {"pages": 0}, t0, corrupt=True)
 
+    dark_done = set()
     fact = {"pages": doc.page_count, "page_sizes_mm": [], "fonts": [], "min_dpi": None,
             "images": 0, "colorspaces": set(), "spot_colors": []}
     spot_names = set()
@@ -151,6 +152,15 @@ def analyze(path, profile="offset_coated", opts=None):
             fact["colorspaces"].add(cs_name or "?")
             if cs_name in ("DeviceRGB", "CalRGB", "ICCBased") and info.get("colorspace", 3) == 3:
                 add("rgb_color", "error" if offset else "warning", pno, bb, "image", key=f"img{info.get('xref',0)}")
+            xr = info.get("xref", 0)
+            if xr and xr not in dark_done and len(dark_done) < 8:
+                dark_done.add(xr)
+                try:
+                    pil = _pdf_image_pil(doc, xr)
+                    dk = _is_dark_photo(pil) if pil else None
+                    if dk is not None:
+                        add("dark_image", "warning", pno, bb, f"{dk*100:.0f}%", key=f"dark{xr}")
+                except Exception: pass
 
         # hairlines
         try:
@@ -164,6 +174,30 @@ def analyze(path, profile="offset_coated", opts=None):
     fact["colorspaces"] = sorted(fact["colorspaces"])
     fact["min_dpi"] = round(fact["min_dpi"]) if fact["min_dpi"] else None
     return _pack(findings, fact, t0)
+
+def _dark_stats(im):
+    """Photo-like dark image? returns (mean_luma, std_luma, share_near_black) on a small thumbnail."""
+    g = im.convert("L"); g.thumbnail((200, 200))
+    px = list(g.getdata()); n = len(px) or 1
+    mean = sum(px) / n
+    std = (sum((p - mean) ** 2 for p in px) / n) ** 0.5
+    dark = sum(1 for p in px if p < 30) / n
+    return mean, std, dark
+
+def _is_dark_photo(im):
+    mean, std, dark = _dark_stats(im)
+    if std < 3: return None  # flat fill / logo, not a photo
+    if (mean < 80 and dark >= 0.30) or dark >= 0.45: return dark
+    return None
+
+def _pdf_image_pil(doc, xref):
+    import fitz
+    from PIL import Image
+    pix = fitz.Pixmap(doc, xref)
+    if pix.width * pix.height > 25_000_000: return None
+    if pix.colorspace is None or pix.colorspace.n != 3 or pix.alpha:
+        pix = fitz.Pixmap(fitz.csRGB, pix) if not pix.alpha else fitz.Pixmap(fitz.csRGB, fitz.Pixmap(pix, 0))
+    return Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
 def _has_key(doc, page, key):
     try: return doc.xref_get_key(page.xref, key)[0] != "null"
@@ -228,4 +262,8 @@ def analyze_image(path, profile="digital_toner", opts=None):
     if im.mode in ("RGB", "RGBA", "P", "L", "LA"):
         if im.mode != "L": add("rgb_color", "warning" if profile.startswith("offset") else "confirm", "image")
     add("bleed_unknown", "confirm")
+    try:
+        dk = _is_dark_photo(im)
+        if dk is not None: add("dark_image", "warning", f"{dk*100:.0f}%")
+    except Exception: pass
     return _pack(findings, fact, t0)
