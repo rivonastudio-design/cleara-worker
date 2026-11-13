@@ -48,10 +48,12 @@ def process(sb, job):
         if ft not in ("pdf", "png", "jpg"):
             raise ValueError("file type not supported yet: " + ft)
         pr = sb.preset(job.get("preset_id"))
-        opts = {}
+        # job options; shape_cut / single_colour are read only if the jobs table has those columns
+        opts = {"mode": job.get("mode") or "single", "shape_cut": bool(job.get("shape_cut")),
+                "single_colour": bool(job.get("single_colour"))}
         if pr:
-            opts = {"expected_mm": (float(pr["width_mm"]), float(pr["height_mm"])),
-                    "bleed_mm": float(pr["bleed_mm"]), "safe_mm": float(pr["safe_mm"])}
+            opts.update({"expected_mm": (float(pr["width_mm"]), float(pr["height_mm"])),
+                         "bleed_mm": float(pr["bleed_mm"]), "safe_mm": float(pr["safe_mm"])})
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, "in." + ft); sb.download(job["file_path"], p)
             fn = analyze_full if ft == "pdf" else analyze_image

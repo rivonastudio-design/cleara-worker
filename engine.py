@@ -1,4 +1,4 @@
-"""Extra checks layered on top of analyzer.py: spelling (confirm-only), image TAC, page previews."""
+"""Extra layer on top of analyzer.py: spelling (confirm-only) and page previews."""
 import io, os, re, time
 import warnings; warnings.filterwarnings("ignore")
 import pymupdf as fitz
@@ -25,61 +25,43 @@ def _finding(code, sev, page, bbox, v, e):
             "value": str(v), "expected": str(e), "msg": msg, "fix": fix}
 
 def _spelling(doc):
-    """English only, confirm-level: skips names, ALL-CAPS and short words."""
+    """English only, confirm-level: skips names, ALL-CAPS, short words and pages that are mostly not English."""
     global _SPELL
     from spellchecker import SpellChecker
     if _SPELL is None: _SPELL = SpellChecker()
     out, seen = [], set()
     for pno, page in enumerate(doc, start=1):
-        for blk in page.get_text("dict")["blocks"]:
-            for ln in blk.get("lines", []):
-                for sp in ln["spans"]:
-                    for w in re.findall(r"[A-Za-z]{4,}", sp["text"]):
-                        lw = w.lower()
-                        if w.isupper() or lw in seen: continue
-                        if _SPELL.known([lw]): continue
-                        sug = _SPELL.correction(lw)
-                        if not sug or sug == lw: continue
-                        # Capitalised words may be names: flag only a clear one-letter typo of a longer word
-                        if w[0].isupper() and (len(lw) < 6 or sug not in _SPELL.edit_distance_1(lw)): continue
-                        seen.add(lw)
-                        out.append(_finding("spelling", "confirm", pno, fitz.Rect(sp["bbox"]), w, sug))
-                        if len(out) >= 8: return out
+        spans = [sp for blk in page.get_text("dict")["blocks"] for ln in blk.get("lines", []) for sp in ln["spans"]]
+        words = {w.lower() for sp in spans for w in re.findall(r"[A-Za-z]{4,}", sp["text"]) if not w.isupper()}
+        if words:
+            unknown = _SPELL.unknown(words)
+            if len(words) >= 6 and len(unknown) / len(words) > 0.35: continue   # not an English page
+        for sp in spans:
+            for w in re.findall(r"[A-Za-z]{4,}", sp["text"]):
+                lw = w.lower()
+                if w.isupper() or lw in seen: continue
+                if _SPELL.known([lw]): continue
+                sug = _SPELL.correction(lw)
+                if not sug or sug == lw: continue
+                # Capitalised words may be names: flag only a clear one-letter typo of a longer word
+                if w[0].isupper() and (len(lw) < 6 or sug not in _SPELL.edit_distance_1(lw)): continue
+                seen.add(lw)
+                out.append(_finding("spelling", "confirm", pno, fitz.Rect(sp["bbox"]), w, sug))
+                if len(out) >= 8: return out
     return out
-
-def _image_tac(doc, xref):
-    from PIL import Image
-    if not xref: return None
-    ei = doc.extract_image(xref)
-    if not ei or ei.get("colorspace") != 4: return None
-    im = Image.open(io.BytesIO(ei["image"]))
-    if im.mode != "CMYK": return None
-    im.thumbnail((200, 200))
-    px = sorted(sum(p) for p in im.getdata())
-    return px[max(int(len(px) * 0.995) - 1, 0)] / 255 * 100
 
 def analyze_full(path, profile="offset_coated", opts=None):
     t0 = time.time()
     res = analyze(path, profile, opts)
     if res["corrupt"]: return res
-    o = dict(DEFAULTS); o.update(opts or {})
     extra = []
     try:
-        doc = fitz.open(path)
-        extra += _spelling(doc)
-        if profile.startswith("offset"):
-            for pno, page in enumerate(doc, start=1):
-                for info in page.get_image_info(xrefs=True):
-                    try: tv = _image_tac(doc, info.get("xref", 0))
-                    except Exception: tv = None
-                    if tv and tv > o["max_tac"] + 5:
-                        extra.append(_finding("tac_high", "warning", pno, fitz.Rect(info["bbox"]), f"{tv:.0f}%", f"{o['max_tac']}%"))
+        extra += _spelling(fitz.open(path))
     except Exception:
         pass
     if not extra: return res
     findings = res["report"]["findings"] + extra
-    out = analyzer._pack(findings, res["fact_sheet"], t0 - res["processing_ms"] / 1000.0)
-    return out
+    return analyzer._pack(findings, res["fact_sheet"], t0)
 
 def render_previews(path, outdir, max_px=1100):
     """bbox values are in PDF points; UI scales by px_w / w_pt."""

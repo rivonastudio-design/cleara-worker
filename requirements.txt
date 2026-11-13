@@ -2,3 +2,4 @@ pymupdf
 requests
 pillow
 pyspellchecker
+numpy
