@@ -39,6 +39,28 @@ class Sb:
         r = requests.get(f"{self.url}/storage/v1/object/uploads/{path}", headers=self.h, timeout=120)
         r.raise_for_status(); open(dest, "wb").write(r.content)
 
+def mark_findings(findings, previews):
+    """Attach a marker (% position on that page's preview picture) to every finding that
+    has an exact spot (bbox). Lets the report draw the same numbered circle on the preview
+    that is shown next to that problem and its solution."""
+    by_page = {p["page"]: p for p in previews}
+    for f in findings:
+        pv = by_page.get(f.get("page"))
+        bbox = f.get("bbox")
+        if not pv or not bbox or not pv.get("w_pt") or not pv.get("h_pt"):
+            continue
+        try:
+            x0, y0, x1, y1 = bbox
+            f["marker"] = {
+                "page": f["page"],
+                "x_pct": round(max(0, min(100, x0 / pv["w_pt"] * 100)), 2),
+                "y_pct": round(max(0, min(100, y0 / pv["h_pt"] * 100)), 2),
+                "w_pct": round(max(0, x1 - x0) / pv["w_pt"] * 100, 2),
+                "h_pct": round(max(0, y1 - y0) / pv["h_pt"] * 100, 2),
+            }
+        except Exception:
+            pass
+
 def process(sb, job):
     jid = job["id"]
     if not sb.claim(jid): return
@@ -66,6 +88,7 @@ def process(sb, job):
                     sb.upload_preview(path, x["file"])
                     prev.append({"page": x["page"], "path": path, "w_pt": x["w_pt"], "h_pt": x["h_pt"], "px_w": x["px_w"], "px_h": x["px_h"]})
                 res["fact_sheet"]["previews"] = prev
+                mark_findings(res["report"]["findings"], prev)
             except Exception as e:
                 print("preview skipped:", e)
         s = res["report"]["summary"]

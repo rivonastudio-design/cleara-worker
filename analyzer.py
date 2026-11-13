@@ -372,14 +372,15 @@ def analyze(path, profile="offset_coated", opts=None):
             dpi = min(info["width"] / (bb.width/72), info["height"] / (bb.height/72))
             fact["min_dpi"] = dpi if fact["min_dpi"] is None else min(fact["min_dpi"], dpi)
             xr = info.get("xref", 0)
+            pos = f"{xr}_{round(bb.x0)}_{round(bb.y0)}"   # same image reused at a different spot is a separate problem
             if dpi < o["min_dpi_err"]:
-                add("low_dpi", "error", pno, bb, f"{dpi:.0f} dpi", f"{o['min_dpi_warn']} dpi", key=xr)
+                add("low_dpi", "error", pno, bb, f"{dpi:.0f} dpi", f"{o['min_dpi_warn']} dpi", key=pos)
             elif dpi < o["min_dpi_warn"] - 1:
-                add("low_dpi", "warning", pno, bb, f"{dpi:.0f} dpi", f"{o['min_dpi_warn']} dpi", key=xr)
+                add("low_dpi", "warning", pno, bb, f"{dpi:.0f} dpi", f"{o['min_dpi_warn']} dpi", key=pos)
             cs_name = info.get("cs-name") or ""
             fact["colorspaces"].add(cs_name or "?")
             if cs_name in ("DeviceRGB", "CalRGB", "ICCBased") and info.get("colorspace", 3) == 3:
-                add("rgb_color", "error", pno, bb, "image", key=f"img{xr}")
+                add("rgb_color", "error", pno, bb, "image", key=f"img{xr}_{round(bb.x0)}_{round(bb.y0)}")
             if xr and xr not in dark_done and len(dark_done) < 8:
                 dark_done.add(xr)
                 try:
@@ -516,7 +517,11 @@ def _pdf_image_pil(doc, xref):
 
 def _pack(findings, fact, t0, corrupt=False):
     order = {"error": 0, "warning": 1, "confirm": 2}
-    findings.sort(key=lambda f: (order[f["severity"]], f["page"] or 0))
+    # page order first (so the numbers read the same way as flipping through the preview),
+    # then severity within the same page.
+    findings.sort(key=lambda f: (f["page"] or 0, order[f["severity"]]))
+    for i, f in enumerate(findings, start=1):
+        f["no"] = i          # fixed 1..N label. Always every number, 1 to the total count, never skipped or random.
     e = sum(f["severity"] == "error" for f in findings)
     w = sum(f["severity"] == "warning" for f in findings)
     c = sum(f["severity"] == "confirm" for f in findings)
