@@ -365,7 +365,11 @@ def analyze(path, profile="offset_coated", opts=None):
         page_nums[pno] = nums_here
 
         # 12, 5, 13: images
-        for info in page.get_image_info(xrefs=True):
+        try:
+            img_infos, huge = list(page.get_image_info(xrefs=True)), False
+        except Exception:
+            img_infos, huge = _huge_image_fallback(doc, page), True
+        for info in img_infos:
             fact["images"] += 1
             bb = fitz.Rect(info["bbox"])
             if bb.width < 1 or bb.height < 1: continue
@@ -377,6 +381,7 @@ def analyze(path, profile="offset_coated", opts=None):
                 add("low_dpi", "error", pno, bb, f"{dpi:.0f} dpi", f"{o['min_dpi_warn']} dpi", key=pos)
             elif dpi < o["min_dpi_warn"] - 1:
                 add("low_dpi", "warning", pno, bb, f"{dpi:.0f} dpi", f"{o['min_dpi_warn']} dpi", key=pos)
+            if info.get("huge"): continue   # too large to decode: dpi is checked, colour/darkness are not
             cs_name = info.get("cs-name") or ""
             fact["colorspaces"].add(cs_name or "?")
             if cs_name in ("DeviceRGB", "CalRGB", "ICCBased") and info.get("colorspace", 3) == 3:
@@ -388,6 +393,8 @@ def analyze(path, profile="offset_coated", opts=None):
                     dk = _is_dark_photo(pil) if pil else None
                     if dk is not None: add("dark_image", "warning", pno, bb, _pct(dk*100), key=f"dark{xr}")
                 except Exception: pass
+        if huge and img_infos:
+            add("huge_image_skip", "confirm", pno, key="huge")
 
         # 14: thin lines   29: border close to the cutting edge
         for d in drs:
@@ -505,6 +512,59 @@ def _is_dark_photo(im):
     if std < 3: return None  # flat fill / logo, not a photo
     if (mean < 80 and dark >= 0.30) or dark >= 0.45: return dark
     return None
+
+_CM_DO = re.compile(rb"(?:([-\d.]+(?:\s+[-\d.]+){5})\s+cm\b)|(/[^\s/()<>\[\]]+)\s+Do\b|(\bq\b)|(\bQ\b)")
+
+def _xobject_map(doc, xref):
+    out = {}
+    try:
+        typ, val = doc.xref_get_key(xref, "Resources/XObject")
+        if typ == "xref": val = doc.xref_object(int(val.split()[0]), compressed=True)
+        elif typ != "dict": return out
+    except Exception:
+        return out
+    for nm, x in re.findall(r"/([^\s/<>\[\]]+)\s+(\d+)\s+0\s+R", val):
+        out[nm] = int(x)
+    return out
+
+def _huge_image_fallback(doc, page):
+    """Used only when PyMuPDF cannot decode an image on this page at all because it is very
+    large (a real, legitimate high-resolution image can still hit this). Gets the width/height
+    straight from the PDF's own object (no decode needed, so this always works) and the
+    on-page position by walking the page's own drawing commands (cm/Do), so the resolution
+    (dpi) can still be checked even though the picture itself cannot be opened."""
+    out = []
+    try:
+        xobj = _xobject_map(doc, page.xref)
+        by_xref = {}
+        for info in page.get_images(full=True):
+            xref, smask, w, h, bpc, cs, altcs, name, filt, ref = info
+            by_xref[xref] = (w, h, cs)
+        H = page.mediabox.height
+        stack, ctm = [], fitz.Matrix(1, 0, 0, 1, 0, 0)
+        for m in _CM_DO.finditer(page.read_contents()):
+            cm, do, q, qq = m.groups()
+            if q: stack.append(ctm)
+            elif qq:
+                if stack: ctm = stack.pop()
+            elif cm:
+                ctm = fitz.Matrix(*(float(x) for x in cm.split())) * ctm
+            elif do:
+                name = do[1:].decode("latin-1")
+                xref = xobj.get(name)
+                if xref not in by_xref: continue
+                r = fitz.Rect(0, 0, 1, 1) * ctm
+                x0, x1 = sorted((r.x0, r.x1)); y0, y1 = sorted((r.y0, r.y1))
+                rr = fitz.Rect(x0, H - y1, x1, H - y0)      # PDF space (bottom-up) -> page.rect space (top-down)
+                if page.rotation: rr = rr * page.rotation_matrix; rr.normalize()
+                rr = rr & page.rect
+                if rr.is_empty: continue
+                w, h, cs = by_xref[xref]
+                out.append({"xref": xref, "width": w, "height": h, "bbox": rr,
+                            "cs-name": cs, "colorspace": None, "huge": True})
+    except Exception:
+        pass
+    return out
 
 def _pdf_image_pil(doc, xref):
     from PIL import Image

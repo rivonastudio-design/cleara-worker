@@ -165,6 +165,11 @@ M = {
  "hi": ("गहरे बैकग्राउंड पर छोटा सफ़ेद टेक्स्ट ({v})। इंक भरने से पढ़ना मुश्किल हो सकता है।", "टेक्स्ट बड़ा/मोटा करें (कम से कम {e})।"),
  "gu": ("ઘેરા બેકગ્રાઉન્ડ પર નાનું સફેદ ટેક્સ્ટ ({v}). ઇંક ભરાવાથી વાંચવું મુશ્કેલ થઈ શકે.", "ટેક્સ્ટ મોટું/જાડું કરો (ઓછામાં ઓછું {e})."),
  "hinglish": ("Dark background pe chhota safed text ({v}). Ink bharne se padhna mushkil ho sakta hai.", "Text bada/bold karo (kam se kam {e}).")},
+"huge_image_skip": {
+ "en": ("One image on this page is very high-resolution. Its size (dpi) was checked, but its colour and darkness could not be checked automatically.", "Please look at this image once yourself before printing."),
+ "hi": ("इस पेज की एक इमेज बहुत हाई-रेज़ोल्यूशन है। उसका dpi चेक हो गया, पर रंग और गहराई अपने-आप चेक नहीं हो सकी।", "प्रिंट से पहले इस इमेज को खुद एक बार देख लें।"),
+ "gu": ("આ પેજની એક ઇમેજ ખૂબ હાઈ-રિઝોલ્યુશન છે. તેનું dpi ચેક થયું, પણ રંગ અને ઘેરાપણું જાતે ચેક ન થઈ શક્યું.", "પ્રિન્ટ પહેલાં આ ઇમેજ જાતે એક વાર જોઈ લો."),
+ "hinglish": ("Is page ki ek image bahut high-resolution hai. Uska dpi check ho gaya, par color aur darkness apne-aap check nahi ho saki.", "Print se pehle is image ko khud ek baar dekh lo.")},
 "corrupt": {
  "en": ("This file could not be opened. It may be corrupt or password-protected.", "Export the file again and upload. Your credits are refunded."),
  "hi": ("यह फ़ाइल खुल नहीं सकी। यह खराब या पासवर्ड वाली हो सकती है।", "फ़ाइल दोबारा एक्सपोर्ट करके अपलोड करें। आपके क्रेडिट वापस हो गए हैं।"),
