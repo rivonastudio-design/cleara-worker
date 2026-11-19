@@ -271,7 +271,7 @@ def analyze(path, profile="offset_coated", opts=None):
     if form_ev.get("mix_line"): add("mix_black", "warning", v="line", key="ml")
     if form_ev.get("reg_fill"): add("registration_black", "error", key="rb")
 
-    fonts_seen, dark_done, page_nums, first_size = set(), set(), {}, None
+    fonts_seen, dark_done, dark_pos_done, page_nums, first_size = set(), set(), set(), {}, None
     for pno, page in enumerate(doc, start=1):
         full = page.rect
         trim, src, size_ok = _trim(doc, page, o)
@@ -386,12 +386,17 @@ def analyze(path, profile="offset_coated", opts=None):
             fact["colorspaces"].add(cs_name or "?")
             if cs_name in ("DeviceRGB", "CalRGB", "ICCBased") and info.get("colorspace", 3) == 3:
                 add("rgb_color", "error", pno, bb, "image", key=f"img{xr}_{round(bb.x0)}_{round(bb.y0)}")
-            if xr and xr not in dark_done and len(dark_done) < 8:
+            pos_key = (pno, round(bb.x0), round(bb.y0), round(bb.x1), round(bb.y1))
+            if xr and xr not in dark_done and pos_key not in dark_pos_done and len(dark_done) < 8:
                 dark_done.add(xr)
                 try:
                     pil = _pdf_image_pil(doc, xr)
                     dk = _is_dark_photo(pil) if pil else None
-                    if dk is not None: add("dark_image", "warning", pno, bb, _pct(dk*100), key=f"dark{xr}")
+                    if dk is not None:
+                        # several images can be stacked at the exact same spot (layered design) —
+                        # only the first dark one found there is reported, so it isn't repeated.
+                        dark_pos_done.add(pos_key)
+                        add("dark_image", "warning", pno, bb, _pct(dk*100), key=f"dark{xr}")
                 except Exception: pass
         if huge and img_infos:
             add("huge_image_skip", "confirm", pno, key="huge")
@@ -576,10 +581,17 @@ def _pdf_image_pil(doc, xref):
 
 
 def _pack(findings, fact, t0, corrupt=False):
-    order = {"error": 0, "warning": 1, "confirm": 2}
-    # page order first (so the numbers read the same way as flipping through the preview),
-    # then severity within the same page.
-    findings.sort(key=lambda f: (f["page"] or 0, order[f["severity"]]))
+    BIG = 10**9
+    def sort_key(f):
+        # page order first, then top-to-bottom / left-to-right on that page — so the numbers
+        # read in the same order as scanning the preview image. Findings with no exact page/spot
+        # (whole-document or whole-page issues) sort to the end of their group.
+        page = f["page"] if f["page"] is not None else BIG
+        bb = f.get("bbox")
+        y0 = bb[1] if bb else BIG
+        x0 = bb[0] if bb else BIG
+        return (page, y0, x0)
+    findings.sort(key=sort_key)
     for i, f in enumerate(findings, start=1):
         f["no"] = i          # fixed 1..N label. Always every number, 1 to the total count, never skipped or random.
     e = sum(f["severity"] == "error" for f in findings)
