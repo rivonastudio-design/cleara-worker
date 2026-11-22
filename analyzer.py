@@ -16,7 +16,7 @@ def mm(pt): return pt * PT_MM
 def pts(m): return m / PT_MM
 
 DEFAULTS = {"bleed_mm": 5.0, "safe_mm": 5.0, "min_dpi_warn": 300, "min_dpi_err": 150,
-            "min_text_pt": 5.0, "min_line_pt": 0.25, "max_tac": 300, "expected_mm": None,
+            "min_text_pt": 6.0, "min_line_pt": 0.25, "max_tac": 300, "expected_mm": None,
             "mode": "single",          # "single" or "sheet" (mixed-job sheet)
             "shape_cut": False,        # shape / die cutting job -> needs cut_overlap_mm
             "single_colour": False,    # single-colour job -> mixed colours are an error
@@ -54,6 +54,7 @@ _INLINE = re.compile(rb"\bBI\b.*?\bEI\b", re.S)
 _FILL = {b"f", b"F", b"f*", b"B", b"B*", b"b", b"b*"}
 _STROKE = {b"S", b"s", b"B", b"B*", b"b", b"b*"}
 _TEXT = {b"Tj", b"TJ", b"'", b'"'}
+_THIN_FONT = re.compile(r"thin|hairline|ultra\s*light|extra\s*light|\blight\b", re.I)
 
 def _white(c):
     if not c: return False
@@ -344,14 +345,19 @@ def analyze(path, profile="offset_coated", opts=None):
         safe = pts(o["safe_mm"])
         inner = fitz.Rect(trim.x0+safe, trim.y0+safe, trim.x1-safe, trim.y1-safe)
         nums_here = []
+        has_vector_text = False
         for blk in blocks:
             for ln in blk.get("lines", []):
                 for sp in ln["spans"]:
                     txt = sp["text"].strip()
                     if not txt: continue
+                    has_vector_text = True
                     r = fitz.Rect(sp["bbox"])
                     if sp["size"] < o["min_text_pt"]:
                         add("small_text", "warning", pno, r, f"{sp['size']:.1f} pt", f"{o['min_text_pt']:.0f} pt", key=round(r.x0))
+                    elif sp["size"] < o["min_text_pt"] + 3 and _THIN_FONT.search(sp["font"].split("+")[-1]):
+                        add("thin_font_small", "warning", pno, r, f"{sp['size']:.1f} pt ({sp['font'].split('+')[-1]})",
+                            f"{o['min_text_pt']:.0f} pt", key=round(r.x0))
                     if not sheet and r.intersects(trim) and not inner.contains(r):
                         d = min(r.x0-trim.x0, r.y0-trim.y0, trim.x1-r.x1, trim.y1-r.y1)
                         add("safe_margin", "warning", pno, r, f"{max(mm(d),0):.1f} mm", f"{o['safe_mm']:.0f} mm", key=round(r.x0)*1000+round(r.y0))
@@ -369,10 +375,12 @@ def analyze(path, profile="offset_coated", opts=None):
             img_infos, huge = list(page.get_image_info(xrefs=True)), False
         except Exception:
             img_infos, huge = _huge_image_fallback(doc, page), True
+        scan_like = False
         for info in img_infos:
             fact["images"] += 1
             bb = fitz.Rect(info["bbox"])
             if bb.width < 1 or bb.height < 1: continue
+            if (bb & trim).get_area() >= 0.8 * trim.get_area(): scan_like = True
             dpi = min(info["width"] / (bb.width/72), info["height"] / (bb.height/72))
             fact["min_dpi"] = dpi if fact["min_dpi"] is None else min(fact["min_dpi"], dpi)
             xr = info.get("xref", 0)
@@ -400,6 +408,10 @@ def analyze(path, profile="offset_coated", opts=None):
                 except Exception: pass
         if huge and img_infos:
             add("huge_image_skip", "confirm", pno, key="huge")
+        # scanned/flattened page: no real (vector) text at all, just one big picture covering it —
+        # any text inside that picture can't be measured, so just a soft heads-up, not an error
+        if scan_like and not has_vector_text and not blank:
+            add("scanned_maybe_blurry", "confirm", pno, key="scan")
 
         # 14: thin lines   29: border close to the cutting edge
         for d in drs:

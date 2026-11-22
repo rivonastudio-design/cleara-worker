@@ -40,6 +40,16 @@ M = {
  "hi": ("टेक्स्ट {v} है, {e} से छोटा। प्रिंट में पढ़ना मुश्किल हो सकता है।", "टेक्स्ट का साइज़ बढ़ाएँ।"),
  "gu": ("ટેક્સ્ટ {v} છે, {e} કરતાં નાનું. પ્રિન્ટમાં વાંચવું મુશ્કેલ થઈ શકે.", "ટેક્સ્ટનું સાઇઝ વધારો."),
  "hinglish": ("Text {v} hai, {e} se chhota. Print me padhna mushkil ho sakta hai.", "Text ka size badhao.")},
+"scanned_maybe_blurry": {
+ "en": ("This page looks like a scanned/flattened picture, not real text. We can't check if any text inside it is too small or blurry.", "Open the picture and zoom in — if text looks blurry or too small, rescan at a higher resolution or recreate it with real text."),
+ "hi": ("ये पेज स्कैन/फ्लैट की गई तस्वीर जैसा लग रहा है, असली टेक्स्ट नहीं। इसके अंदर का टेक्स्ट छोटा या ब्लर है या नहीं, ये हम चेक नहीं कर सकते।", "तस्वीर खोलकर ज़ूम करके देखें — अगर टेक्स्ट ब्लर या बहुत छोटा लगे, तो ज़्यादा resolution में फिर से स्कैन करें या असली टेक्स्ट से बनाएँ।"),
+ "gu": ("આ પેજ સ્કેન/ફ્લેટ કરેલી તસવીર જેવું લાગે છે, સાચું ટેક્સ્ટ નથી. તેની અંદરનું ટેક્સ્ટ નાનું કે બ્લર છે કે નહીં, તે અમે ચેક કરી શકતા નથી.", "તસવીર ખોલીને ઝૂમ કરીને જુઓ — ટેક્સ્ટ બ્લર કે બહુ નાનું લાગે તો વધુ resolution માં ફરી સ્કેન કરો અથવા સાચા ટેક્સ્ટથી બનાવો."),
+ "hinglish": ("Ye page scan/flatten ki hui picture jaisa lag raha hai, real text nahi. Iske andar ka text chhota ya blur hai ya nahi, ye hum check nahi kar sakte.", "Picture khol ke zoom karo — agar text blur ya bahut chhota lage, to zyada resolution me firse scan karo ya real text se banao.")},
+"thin_font_small": {
+ "en": ("Text is {v}, a thin/light font close to the {e} limit. Thin strokes at this size may look broken or go missing in print.", "Use a regular/bold weight instead of a thin/light font, or increase the text size."),
+ "hi": ("टेक्स्ट {v} है, एक पतला/लाइट फ़ॉन्ट {e} लिमिट के पास। इस साइज़ में पतली लाइनें प्रिंट में टूटी या गायब दिख सकती हैं।", "पतले/लाइट फ़ॉन्ट की जगह रेगुलर/बोल्ड इस्तेमाल करें, या टेक्स्ट साइज़ बढ़ाएँ।"),
+ "gu": ("ટેક્સ્ટ {v} છે, પાતળો/લાઇટ ફોન્ટ {e} લિમિટની નજીક. આ સાઇઝમાં પાતળી લાઇનો પ્રિન્ટમાં તૂટેલી અથવા ગાયબ દેખાઈ શકે.", "પાતળા/લાઇટ ફોન્ટને બદલે રેગ્યુલર/બોલ્ડ વાપરો, અથવા ટેક્સ્ટ સાઇઝ વધારો."),
+ "hinglish": ("Text {v} hai, ek thin/light font {e} limit ke paas. Is size me patli lines print me tooti ya gayab dikh sakti hain.", "Thin/light font ki jagah regular/bold use karo, ya text size badhao.")},
 "hairline": {
  "en": ("Line is {v} thick, thinner than {e}. May not print.", "Make the line at least 0.25 pt."),
  "hi": ("लाइन {v} मोटी है, {e} से पतली। प्रिंट न हो सकती है।", "लाइन कम से कम 0.25 pt रखें।"),
