@@ -2,6 +2,18 @@
 import os, sys, time, tempfile, traceback
 import requests
 from engine import analyze_full, analyze_image, render_previews, image_preview
+from messages import build as build_msg
+
+
+def _crash_report():
+    """Used when something unexpected breaks the job (not a 'bad file' we already recognise,
+    e.g. an unsupported format or a download hiccup). Without this, the report would be left
+    empty and the client would just see 'Not Printable' with no explanation at all."""
+    msg, fix = build_msg("processing_failed")
+    finding = {"code": "processing_failed", "severity": "error", "page": None, "bbox": None,
+               "value": "", "expected": "", "msg": msg, "fix": fix, "no": 1}
+    return {"version": 2, "summary": {"errors": 1, "warnings": 0, "confirms": 0, "result": "error"},
+            "findings": [finding]}
 
 def load_env():
     if os.path.exists(".env"):
@@ -102,7 +114,9 @@ def process(sb, job):
         print(res["result"], f"({res['processing_ms']} ms)")
     except Exception as e:
         traceback.print_exc()
-        try: sb.update(jid, {"status": "failed", "result": "error"})
+        try:
+            sb.update(jid, {"status": "failed", "result": "error", "report": _crash_report(),
+                            "fact_sheet": {"pages": 0}})
         except Exception: pass
         print("FAILED")
 

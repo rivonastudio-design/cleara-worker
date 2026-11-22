@@ -175,6 +175,11 @@ M = {
  "hi": ("यह फ़ाइल खुल नहीं सकी। यह खराब या पासवर्ड वाली हो सकती है।", "फ़ाइल दोबारा एक्सपोर्ट करके अपलोड करें। आपके क्रेडिट वापस हो गए हैं।"),
  "gu": ("આ ફાઇલ ખુલી શકી નહીં. તે બગડેલી અથવા પાસવર્ડવાળી હોઈ શકે.", "ફાઇલ ફરી એક્સપોર્ટ કરીને અપલોડ કરો. તમારા ક્રેડિટ પાછા આપ્યા છે."),
  "hinglish": ("Ye file khul nahi saki. Corrupt ya password wali ho sakti hai.", "File dobara export karke upload karo. Aapke credits wapas ho gaye.")},
+"processing_failed": {
+ "en": ("Something went wrong while checking this file (not a problem with your design).", "Please try uploading again. If it keeps happening, contact support@cleara.in. Your credits are refunded."),
+ "hi": ("इस फ़ाइल को चेक करते समय कुछ गड़बड़ हो गई (आपकी डिज़ाइन में कोई समस्या नहीं है)।", "कृपया दोबारा अपलोड करें। अगर बार-बार हो तो support@cleara.in पर संपर्क करें। आपके क्रेडिट वापस हो गए हैं।"),
+ "gu": ("આ ફાઇલ ચેક કરતી વખતે કંઈક ગરબડ થઈ (તમારી ડિઝાઇનમાં કોઈ સમસ્યા નથી).", "કૃપા કરી ફરી અપલોડ કરો. વારંવાર થાય તો support@cleara.in પર સંપર્ક કરો. તમારા ક્રેડિટ પાછા આપ્યા છે."),
+ "hinglish": ("Is file ko check karte waqt kuch gadbad ho gayi (tumhari design mein koi problem nahi hai).", "Please dobara upload karo. Baar-baar ho to support@cleara.in par contact karo. Aapke credits wapas ho gaye.")},
 }
 LANGS = ["en", "hi", "gu", "hinglish"]
 
