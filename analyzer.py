@@ -384,7 +384,7 @@ def analyze(path, profile="offset_coated", opts=None):
             if info.get("huge"): continue   # too large to decode: dpi is checked, colour/darkness are not
             cs_name = info.get("cs-name") or ""
             fact["colorspaces"].add(cs_name or "?")
-            if cs_name in ("DeviceRGB", "CalRGB", "ICCBased") and info.get("colorspace", 3) == 3:
+            if info.get("colorspace", 3) == 3:
                 add("rgb_color", "error", pno, bb, "image", key=f"img{xr}_{round(bb.x0)}_{round(bb.y0)}")
             pos_key = (pno, round(bb.x0), round(bb.y0), round(bb.x1), round(bb.y1))
             if xr and xr not in dark_done and pos_key not in dark_pos_done and len(dark_done) < 8:
