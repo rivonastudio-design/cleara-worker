@@ -3,4 +3,5 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt pillow
 COPY analyzer.py messages.py engine.py worker.py ./
+COPY dict ./dict
 CMD ["python", "-u", "worker.py"]

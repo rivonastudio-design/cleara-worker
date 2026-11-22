@@ -12,12 +12,31 @@ SPELL_MSG = {
  "gu": ("સંભવિત સ્પેલિંગ ભૂલ: '{v}'. શું તમારો મતલબ '{e}' છે?", "સ્પેલિંગ તપાસો. નામ કે બ્રાન્ડ હોય તો અવગણો."),
  "hinglish": ("Spelling galti ho sakti hai: '{v}'. Kya aap '{e}' kehna chahte the?", "Spelling check karo. Naam ya brand ho to ignore karo."),
 }
+# Hindi (Devanagari) dictionary's own suggested "correction" is frequently a nonsense word --
+# Hunspell's edit-distance ranking doesn't model Devanagari conjuncts/matras well, so instead of
+# asserting a specific (possibly wrong) fix, this just flags the word and asks the person to check it.
+SPELL_MSG_HI = {
+ "en": ("This word may have a spelling mistake: '{v}'.", "Check the spelling. Ignore if it is a name or local/regional word."),
+ "hi": ("इस शब्द में स्पेलिंग की गलती हो सकती है: '{v}'।", "स्पेलिंग जाँचें। नाम या क्षेत्रीय शब्द हो तो अनदेखा करें।"),
+ "gu": ("આ શબ્દમાં સ્પેલિંગની ભૂલ હોઈ શકે છે: '{v}'.", "સ્પેલિંગ તપાસો. નામ કે પ્રાદેશિક શબ્દ હોય તો અવગણો."),
+ "hinglish": ("Is word mein spelling mistake ho sakti hai: '{v}'.", "Spelling check karo. Naam ya local/regional word ho to ignore karo."),
+}
 _SPELL = None
+_SPELL_HI = None
+_DEVANAGARI = re.compile(r"[ऀ-ॿ]{2,}")
+# the hi_IN Hunspell dictionary is missing a handful of very common greeting-card plural
+# forms (a narrow affix-rule gap, not a general quality problem -- most vocabulary tested
+# fine). These are correctly-spelled, everyday Hindi words -- never flag them.
+_HINDI_ALLOWLIST = {"शुभकामनाएं", "शुभकामनाएँ", "शुभकामनायें", "बधाईयां", "बधाइयां"}
 
 def _finding(code, sev, page, bbox, v, e):
     if code == "spelling":
         msg = {l: SPELL_MSG[l][0].format(v=v, e=e) for l in LANGS}
         fix = {l: SPELL_MSG[l][1] for l in LANGS}
+    elif code == "spelling_hi":
+        code = "spelling"   # same finding type/UI, just a different message template
+        msg = {l: SPELL_MSG_HI[l][0].format(v=v) for l in LANGS}
+        fix = {l: SPELL_MSG_HI[l][1] for l in LANGS}
     else:
         msg, fix = build(code, v, e)
     return {"code": code, "severity": sev, "page": page,
@@ -50,6 +69,45 @@ def _spelling(doc):
                 if len(out) >= 8: return out
     return out
 
+def _hindi_dict():
+    """Loaded once per worker process (~1.5s) and cached -- never on a file that has no
+    Devanagari text at all, so English/Gujarati-only jobs pay nothing extra."""
+    global _SPELL_HI
+    if _SPELL_HI is None:
+        from spylls.hunspell import Dictionary
+        base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dict", "hi_IN")
+        _SPELL_HI = Dictionary.from_files(base)
+    return _SPELL_HI
+
+def _spelling_hindi(doc):
+    """Hindi only, confirm-level, same spirit as _spelling() above but for Devanagari text.
+    No upper/lower-case signal exists in Devanagari (unlike English), so there is no safe way
+    to tell a real word from a name/place here -- we rely only on "is it in the dictionary"
+    and skip a whole page if too much of it is unknown (probably not clean Hindi, or a page
+    full of proper nouns/addresses)."""
+    full_text = "".join(page.get_text() for page in doc)
+    if not _DEVANAGARI.search(full_text): return []   # no Hindi text at all -- skip, don't even load the dictionary
+    d = _hindi_dict()
+    out, seen = [], set()
+    for pno, page in enumerate(doc, start=1):
+        spans = [sp for blk in page.get_text("dict")["blocks"] for ln in blk.get("lines", []) for sp in ln["spans"]]
+        words = {w for sp in spans for w in _DEVANAGARI.findall(sp["text"])}
+        if words:
+            unknown = sum(1 for w in words if w not in _HINDI_ALLOWLIST and not d.lookup(w))
+            if len(words) >= 6 and unknown / len(words) > 0.35: continue   # not clean Hindi / mostly names on this page
+        for sp in spans:
+            for w in _DEVANAGARI.findall(sp["text"]):
+                if w in seen or w in _HINDI_ALLOWLIST or d.lookup(w): continue
+                # Hunspell's own top "correction" is often a nonsense word for Devanagari (conjuncts
+                # and matras confuse plain edit-distance ranking), so it is not shown to the person --
+                # just require that *some* suggestion exists, as a weak signal this is a real near-miss
+                # typo rather than a name or garbled text the dictionary has nothing close to.
+                if not list(d.suggest(w)): continue
+                seen.add(w)
+                out.append(_finding("spelling_hi", "confirm", pno, fitz.Rect(sp["bbox"]), w, ""))
+                if len(out) >= 8: return out
+    return out
+
 def analyze_full(path, profile="offset_coated", opts=None):
     t0 = time.time()
     res = analyze(path, profile, opts)
@@ -57,6 +115,10 @@ def analyze_full(path, profile="offset_coated", opts=None):
     extra = []
     try:
         extra += _spelling(fitz.open(path))
+    except Exception:
+        pass
+    try:
+        extra += _spelling_hindi(fitz.open(path))
     except Exception:
         pass
     if not extra: return res
