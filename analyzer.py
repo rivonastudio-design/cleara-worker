@@ -424,7 +424,21 @@ def analyze(path, profile="offset_coated", opts=None):
         H_, W_ = T.shape[:2]
         C, M_, Y, K = (T[:, :, i].astype(np.int16) for i in range(4))
         inked = mx > 20
-        has_rgb = F.has("rgb_color", pno)
+        # RGB areas get colour-converted by the renderer when we rasterise to CMYK, which can
+        # show misleading ink numbers there -- exclude just those pixels from ink checks below
+        # (not the whole page: a photo being RGB elsewhere shouldn't hide real over-ink in the
+        # rest of a genuinely-CMYK design).
+        rgb_findings = [f for f in F.items if f["code"] == "rgb_color" and f["page"] == pno]
+        rgb_unlocalised = any(f["bbox"] is None for f in rgb_findings)
+        excl = None
+        if rgb_findings and not rgb_unlocalised:
+            excl = np.zeros((H_, W_), dtype=bool)
+            ox, oy = int(round(trim.x0 * s)), int(round(trim.y0 * s))
+            for f in rgb_findings:
+                bx0, by0, bx1, by1 = f["bbox"]
+                px0 = max(0, int(round(bx0 * s)) - ox); py0 = max(0, int(round(by0 * s)) - oy)
+                px1 = min(W_, int(round(bx1 * s)) - ox); py1 = min(H_, int(round(by1 * s)) - oy)
+                if px1 > px0 and py1 > py0: excl[py0:py1, px0:px1] = True
 
         # 3 / 19: bleed
         if not sheet:
@@ -452,17 +466,22 @@ def analyze(path, profile="offset_coated", opts=None):
         # 7: registration colour inside the design
         if int(((T.min(axis=2)) >= 250).sum()) >= 12: add("registration_black", "error", pno, key="rb")
 
-        if not has_rgb:
+        if not rgb_unlocalised:
+            keep = ~excl if excl is not None else None
             # 8: total ink
             tot = (C + M_ + Y + K) / 2.55
-            if float((tot > o["max_tac"] + 5).mean()) >= 0.005:
-                add("tac_high", "warning", pno, v=_pct(float(np.percentile(tot, 99.9))), e=_pct(o["max_tac"]), key="tac")
+            tot_m = tot[keep] if keep is not None else tot
+            if tot_m.size and float((tot_m > o["max_tac"] + 5).mean()) >= 0.005:
+                add("tac_high", "warning", pno, v=_pct(float(np.percentile(tot_m, 99.9))), e=_pct(o["max_tac"]), key="tac")
             # 6: black above the limit inside mixed colours / photos
-            share = float(((K > o["k_limit"] * 2.55 + 2) & (np.maximum(np.maximum(C, M_), Y) > 25)).mean())
+            kcond = (K > o["k_limit"] * 2.55 + 2) & (np.maximum(np.maximum(C, M_), Y) > 25)
+            kcond_m = kcond[keep] if keep is not None else kcond
+            share = float(kcond_m.mean()) if kcond_m.size else 0.0
             if share >= 0.02: add("k_heavy", "confirm", pno, v=_pct(share*100), e=_pct(o["k_limit"]), key="kh")
             # 23: single-colour job
             if o["single_colour"]:
-                used = [n for n, ch in zip("CMYK", (C, M_, Y, K)) if float((ch > 20).mean()) > 0.002]
+                used = [n for n, ch in zip("CMYK", (C, M_, Y, K))
+                        if float(((ch[keep] if keep is not None else ch) > 20).mean()) > 0.002]
                 if len(used) > 1: add("single_colour_mix", "error", pno, v="+".join(used), key="sc")
 
         dk = _darkness(T)
