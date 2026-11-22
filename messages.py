@@ -51,10 +51,10 @@ M = {
  "gu": ("ટેક્સ્ટ {v} છે, પાતળો/લાઇટ ફોન્ટ {e} લિમિટની નજીક. આ સાઇઝમાં પાતળી લાઇનો પ્રિન્ટમાં તૂટેલી અથવા ગાયબ દેખાઈ શકે.", "પાતળા/લાઇટ ફોન્ટને બદલે રેગ્યુલર/બોલ્ડ વાપરો, અથવા ટેક્સ્ટ સાઇઝ વધારો."),
  "hinglish": ("Text {v} hai, ek thin/light font {e} limit ke paas. Is size me patli lines print me tooti ya gayab dikh sakti hain.", "Thin/light font ki jagah regular/bold use karo, ya text size badhao.")},
 "hairline": {
- "en": ("Line is {v} thick, thinner than {e}. May not print.", "Make the line at least 0.25 pt."),
- "hi": ("लाइन {v} मोटी है, {e} से पतली। प्रिंट न हो सकती है।", "लाइन कम से कम 0.25 pt रखें।"),
- "gu": ("લાઇન {v} જાડી છે, {e} કરતાં પાતળી. પ્રિન્ટ ન થઈ શકે.", "લાઇન ઓછામાં ઓછી 0.25 pt રાખો."),
- "hinglish": ("Line {v} moti hai, {e} se patli. Print na ho sakti hai.", "Line kam se kam 0.25 pt rakho.")},
+ "en": ("Line is {v} thick, thinner than {e}. May not print.", "Make the line at least {e}."),
+ "hi": ("लाइन {v} मोटी है, {e} से पतली। प्रिंट न हो सकती है।", "लाइन कम से कम {e} रखें।"),
+ "gu": ("લાઇન {v} જાડી છે, {e} કરતાં પાતળી. પ્રિન્ટ ન થઈ શકે.", "લાઇન ઓછામાં ઓછી {e} રાખો."),
+ "hinglish": ("Line {v} moti hai, {e} se patli. Print na ho sakti hai.", "Line kam se kam {e} rakho.")},
 "transparency": {
  "en": ("Transparency/opacity effects found.", "Flatten transparency (convert to bitmap) or export as PDF/X-1a."),
  "hi": ("ट्रांसपेरेंसी/ओपेसिटी इफ़ेक्ट मिले।", "ट्रांसपेरेंसी फ्लैटन करें (बिटमैप में बदलें) या PDF/X-1a में एक्सपोर्ट करें।"),
