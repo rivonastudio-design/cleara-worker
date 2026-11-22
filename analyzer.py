@@ -248,7 +248,14 @@ def analyze(path, profile="offset_coated", opts=None):
             for m in re.findall(r"/Separation\s*/([^\s/\]\[]+)", obj):
                 if m not in ("All", "None"): spot_names.add(m.replace("#20", " "))
         if "/ExtGState" in obj or "/Type/ExtGState" in obj.replace(" ", ""):
-            if re.search(r"/(ca|CA)\s+0?\.\d+", obj) and not re.search(r"/(ca|CA)\s+1(\.0+)?\b", obj): has_trans = True
+            # check each /ca (fill alpha) and /CA (stroke alpha) value on its own -- an ExtGState
+            # dict very commonly sets one to a real fraction (e.g. a semi-transparent fill) while
+            # leaving the other at its default of 1 (fully-opaque stroke); scanning the whole
+            # object text for "is there a 1 ANYWHERE" would wrongly cancel out the real fraction
+            for av in re.finditer(r"/(?:ca|CA)\s+([\d.]+)", obj):
+                try:
+                    if float(av.group(1)) < 0.999: has_trans = True; break
+                except ValueError: pass
             if re.search(r"/(OP|op)\s+true", obj): has_op = True
         if re.search(r"/SMask\s+\d+\s+0\s+R", obj): has_trans = True
         if "/ShadingType" in obj: has_shading = True
