@@ -120,6 +120,31 @@ M = {
  "hi": ("इस डिज़ाइन में {v} मिला। प्रिंट क्वालिटी, साइज़ और कंट्रास्ट पर निर्भर करता है कि यह स्कैन होगा या नहीं -- सिर्फ़ फ़ाइल देखकर यह पक्का नहीं कहा जा सकता (सुझाया गया साइज़: कम से कम {e})।", "पूरी प्रिंटिंग से पहले एक सैंपल कॉपी प्रिंट करके फ़ोन से इस कोड को स्कैन करके जाँच लें।"),
  "gu": ("આ ડિઝાઇનમાં {v} મળ્યો. પ્રિન્ટ ક્વોલિટી, સાઇઝ અને કોન્ટ્રાસ્ટ પર આધાર રાખે છે કે તે સ્કેન થશે કે નહીં -- ફક્ત ફાઇલ જોઈને આ પાક્કું કહી શકાતું નથી (સૂચવેલ સાઇઝ: ઓછામાં ઓછું {e}).", "પૂરી પ્રિન્ટિંગ પહેલાં એક સેમ્પલ કોપી પ્રિન્ટ કરીને ફોનથી આ કોડને સ્કેન કરીને ચકાસો."),
  "hinglish": ("Is design mein {v} mila. Print quality, size aur contrast pe depend karta hai ki ye scan hoga ya nahi -- sirf file dekhkar ye pakka nahi kaha ja sakta (recommended size: kam se kam {e}).", "Poori printing se pehle ek sample copy print karke phone se is code ko scan karke test kar lo.")},
+"row_misaligned": {
+ "en": ("Content on both sides of this row (e.g. a name on one side, a phone number on the other) is not level -- one side sits slightly higher or lower than the other.", "Select both sides and use your design software's \"Align\" tool (align middle / vertical center) to bring them onto the same line."),
+ "hi": ("इस row के दोनों तरफ़ की चीज़ें (जैसे एक तरफ़ नाम, दूसरी तरफ़ फ़ोन नंबर) एक लाइन में नहीं हैं -- एक तरफ़ थोड़ा ऊपर या नीचे है।", "दोनों तरफ़ को सेलेक्ट करके डिज़ाइन सॉफ़्टवेयर के \"Align\" टूल (align middle / vertical center) से एक लाइन में लाएँ।"),
+ "gu": ("આ રો ની બંને બાજુની વસ્તુઓ (જેમ કે એક બાજુ નામ, બીજી બાજુ ફોન નંબર) એક લાઇનમાં નથી -- એક બાજુ થોડું ઉપર અથવા નીચે છે.", "બંને બાજુને સિલેક્ટ કરીને ડિઝાઇન સોફ્ટવેરના \"Align\" ટૂલ (align middle / vertical center) થી એક લાઇનમાં લાવો."),
+ "hinglish": ("Is row ke dono taraf ki cheezein (jaise ek taraf naam, doosri taraf phone number) ek line mein nahi hain -- ek taraf thoda upar ya neeche hai.", "Dono taraf ko select karke design software ke \"Align\" tool (align middle / vertical center) se ek line mein lao.")},
+"column_misaligned": {
+ "en": ("These stacked lines don't all start from the same point on the left -- each one begins a little further in or out than the others.", "Select all these lines together and use \"Align Left\" so they all start from the same point."),
+ "hi": ("ये एक के नीचे एक लिखी गई लाइनें सब एक ही जगह से शुरू नहीं होती -- हर एक थोड़ा आगे या पीछे से शुरू होती है।", "इन सभी लाइनों को साथ सेलेक्ट करके \"Align Left\" करें, ताकि सब एक ही जगह से शुरू हों।"),
+ "gu": ("આ એક નીચે એક લખાયેલી લાઇનો બધી એક જ જગ્યાએથી શરૂ થતી નથી -- દરેક થોડું આગળ અથવા પાછળથી શરૂ થાય છે.", "આ બધી લાઇનોને સાથે સિલેક્ટ કરીને \"Align Left\" કરો, જેથી બધી એક જ જગ્યાએથી શરૂ થાય."),
+ "hinglish": ("Ye ek ke neeche ek likhi gayi lines sab ek hi jagah se start nahi hoti -- har ek thoda aage ya peeche se start hoti hai.", "Ye sabhi lines ko sath select karke \"Align Left\" karo, taaki sab ek hi jagah se start ho.")},
+"icon_text_misaligned": {
+ "en": ("An icon and the text next to it (e.g. a phone, email or location icon with its label) are not lined up with each other vertically.", "Select the icon and its text together and use \"Align Middle\" (vertical center) so they line up."),
+ "hi": ("एक icon और उसके साथ का text (जैसे phone, email या location icon और उसका लेबल) एक-दूसरे के साथ vertically लाइन में नहीं हैं।", "icon और उसके text को साथ सेलेक्ट करके \"Align Middle\" (vertical center) करें ताकि वे लाइन में आ जाएँ।"),
+ "gu": ("એક icon અને તેની સાથેનો text (જેમ કે phone, email અથવા location icon અને તેનું label) એકબીજા સાથે vertically લાઇનમાં નથી.", "icon અને તેના textને સાથે સિલેક્ટ કરીને \"Align Middle\" (vertical center) કરો જેથી તે લાઇનમાં આવે."),
+ "hinglish": ("Ek icon aur uske saath ka text (jaise phone, email ya location icon aur uska label) ek-doosre ke saath vertically line mein nahi hai.", "Icon aur uske text ko sath select karke \"Align Middle\" (vertical center) karo taaki wo line mein aa jaye.")},
+"uneven_spacing": {
+ "en": ("The gaps between these stacked lines/rows are not equal -- some gaps are bigger than others, which makes the layout look uneven.", "Select these lines together and use \"Distribute Vertically\" (or set equal line spacing) so the gaps match."),
+ "hi": ("इन एक के नीचे एक lines/rows के बीच का gap बराबर नहीं है -- कोई gap बड़ा है, कोई छोटा, जिससे layout असमान दिखता है।", "इन लाइनों को साथ सेलेक्ट करके \"Distribute Vertically\" (या बराबर line spacing सेट) करें ताकि gaps बराबर हो जाएँ।"),
+ "gu": ("આ એક નીચે એક lines/rows વચ્ચેનો ગેપ સરખો નથી -- કોઈ ગેપ મોટો છે, કોઈ નાનો, જેથી layout અસમાન દેખાય છે.", "આ લાઇનોને સાથે સિલેક્ટ કરીને \"Distribute Vertically\" (અથવા સરખું line spacing સેટ) કરો જેથી ગેપ સરખા થાય."),
+ "hinglish": ("In ek ke neeche ek lines/rows ke beech ka gap barabar nahi hai -- koi gap bada hai, koi chhota, jisse layout asman dikhta hai.", "In lines ko sath select karke \"Distribute Vertically\" (ya barabar line spacing set) karo taaki gaps barabar ho jaye.")},
+"off_center": {
+ "en": ("This part of the design looks like it was meant to sit in the center, but it's shifted slightly to one side.", "Select this part and use your design software's \"Align Center\" (horizontal center) to position it exactly in the middle."),
+ "hi": ("डिज़ाइन का यह हिस्सा center में होना चाहिए था, लेकिन यह थोड़ा एक तरफ़ खिसक गया है।", "इस हिस्से को सेलेक्ट करके डिज़ाइन सॉफ़्टवेयर के \"Align Center\" (horizontal center) से बीच में सही जगह पर रखें।"),
+ "gu": ("ડિઝાઇનનો આ ભાગ સેન્ટરમાં હોવો જોઈતો હતો, પરંતુ તે થોડો એક બાજુ ખસી ગયો છે.", "આ ભાગને સિલેક્ટ કરીને ડિઝાઇન સોફ્ટવેરના \"Align Center\" (horizontal center) થી વચ્ચે બરાબર જગ્યાએ મૂકો."),
+ "hinglish": ("Design ka ye hissa center mein hona chahiye tha, lekin ye thoda ek taraf khisak gaya hai.", "Is hisse ko select karke design software ke \"Align Center\" (horizontal center) se beech mein sahi jagah pe rakho.")},
 "page_size_mixed": {
  "en": ("Page {v} is a different size from page 1 ({e}).", "Make all pages the same size."),
  "hi": ("पेज {v} का साइज़ पेज 1 ({e}) से अलग है।", "सभी पेज एक ही साइज़ के रखें।"),

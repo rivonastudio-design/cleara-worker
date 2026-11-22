@@ -41,6 +41,14 @@ PIXEL_PAGES = 60    # pages that get the ink (pixel) checks
 QR_BARCODE_PAGES = 20   # pages that get the QR/barcode scan (needs its own sharper render, costs more time)
 STREAM_LIMIT = 8_000_000
 
+# alignment / layout design-quality thresholds (business card, letterhead, etc. -- "do things line
+# up the way a professional design would"). Below ALIGN_TOL_MM = already aligned, don't flag.
+# Above ALIGN_NEARMISS_MM = probably two unrelated/intentionally-different elements, don't flag.
+# Only the in-between band (a few mm) looks like a genuine near-miss slip, so only that is flagged.
+ALIGN_TOL_MM = 0.3
+ALIGN_NEARMISS_MM = 2.5
+ICON_MIN_MM, ICON_MAX_MM = 2.0, 14.0   # size range that looks like a contact icon, not a logo/photo
+
 
 class Findings:
     def __init__(self):
@@ -274,6 +282,131 @@ def _grid_check(islands, tol_pt):
     heights = [r.height for r in islands]
     same_size = (max(widths) - min(widths) <= pts(2)) and (max(heights) - min(heights) <= pts(2))
     return is_grid, same_size, len(y0s), len(x0s)
+
+
+# ---------------------------------------------------------------- alignment / layout design-quality
+def _text_lines(blocks):
+    """one rect per visual line of text (merging that line's spans), not per span -- this is the
+    right granularity for 'does this line start at the same x as that line' kind of checks."""
+    out = []
+    for blk in blocks:
+        for ln in blk.get("lines", []):
+            spans = [sp for sp in ln["spans"] if sp["text"].strip()]
+            if not spans: continue
+            r = fitz.Rect(spans[0]["bbox"])
+            for sp in spans[1:]: r |= fitz.Rect(sp["bbox"])
+            out.append(r)
+    return out
+
+def _icon_candidates(drs, img_infos, trim):
+    """small, roughly-square clusters of vector paths or small images -- the size/shape a contact
+    icon (phone, mail, location, whatsapp...) actually is, as opposed to a logo or photo."""
+    cand = [fitz.Rect(d["rect"]) for d in drs if fitz.Rect(d["rect"]).width >= 0.5 and fitz.Rect(d["rect"]).height >= 0.5]
+    pad = pts(0.8)   # merge the few paths that make up ONE icon glyph
+    clusters, changed = cand, True
+    while changed and len(clusters) > 1:
+        changed = False
+        out, used = [], [False] * len(clusters)
+        for i in range(len(clusters)):
+            if used[i]: continue
+            cur = fitz.Rect(clusters[i]); used[i] = True
+            for j in range(i + 1, len(clusters)):
+                if used[j]: continue
+                test = fitz.Rect(cur.x0 - pad, cur.y0 - pad, cur.x1 + pad, cur.y1 + pad)
+                if test.intersects(clusters[j]):
+                    cur |= clusters[j]; used[j] = True; changed = True
+            out.append(cur)
+        clusters = out
+    icons = []
+    for r in clusters:
+        w, h = mm(r.width), mm(r.height)
+        if ICON_MIN_MM <= w <= ICON_MAX_MM and ICON_MIN_MM <= h <= ICON_MAX_MM and 0.4 <= w / h <= 2.5 and r.intersects(trim):
+            icons.append(r)
+    for info in img_infos:
+        r = fitz.Rect(info["bbox"]); w, h = mm(r.width), mm(r.height)
+        if ICON_MIN_MM <= w <= ICON_MAX_MM and ICON_MIN_MM <= h <= ICON_MAX_MM and 0.4 <= w / h <= 2.5 and r.intersects(trim):
+            icons.append(r)
+    return icons
+
+def _icon_text_pairs(icons, lines):
+    """pair each icon with the nearest text line that sits beside it (same visual row, small gap)
+    -- that's the icon's own label (e.g. the phone-icon's own phone number)."""
+    pairs = []
+    for ic in icons:
+        best, best_gap = None, None
+        for ln in lines:
+            top, bot = max(ic.y0, ln.y0), min(ic.y1, ln.y1)
+            if max(0, bot - top) < 0.3 * min(ic.height, ln.height): continue
+            if ln.x0 >= ic.x1: gap = ln.x0 - ic.x1
+            elif ic.x0 >= ln.x1: gap = ic.x0 - ln.x1
+            else: continue   # overlapping horizontally -- not an icon-beside-text layout
+            if gap > pts(15): continue
+            if best_gap is None or gap < best_gap: best, best_gap = ln, gap
+        if best is not None: pairs.append((ic, best))
+    return pairs
+
+def _stacks(lines):
+    """group text lines into vertically-stacked blocks (an address/contact list, a name+title
+    block) -- consecutive lines, sorted top to bottom, that sit close enough together (small gap
+    relative to line height) to read as one running block, not unrelated far-apart text. Returns
+    EVERY group, including lone single lines (a standalone title/heading is still a valid unit
+    for the centering check) -- callers that need a genuine multi-line stack filter by length."""
+    if not lines: return []
+    ls = sorted(lines, key=lambda r: r.y0)
+    stacks, cur = [], [ls[0]]
+    for r in ls[1:]:
+        prev = cur[-1]
+        gap, lh = r.y0 - prev.y1, max(prev.height, r.height, 1)
+        if -0.3 * lh < gap < 1.8 * lh:
+            cur.append(r)
+        else:
+            stacks.append(cur); cur = [r]
+    stacks.append(cur)
+    return stacks
+
+def _cluster1d(vals, tol):
+    order = sorted(range(len(vals)), key=lambda i: vals[i])
+    groups = []
+    for i in order:
+        if groups and vals[i] - vals[groups[-1][-1]] <= tol:
+            groups[-1].append(i)
+        else:
+            groups.append([i])
+    return groups
+
+def _row_align_pairs(lines):
+    """find two clearly-separate columns of short lines (a left column and a right column, like
+    name on one side / phone number on the other of a business card) and pair up the lines that
+    sit roughly in the same horizontal band -- those pairs are meant to be the same visual row."""
+    short = [r for r in lines if r.width < 0.5 * max((x.width for x in lines), default=1) or len(lines) <= 6]
+    if len(short) < 4: return []
+    x0s = [r.x0 for r in short]
+    groups = [[short[i] for i in g] for g in _cluster1d(x0s, pts(3.0))]
+    cols = [g for g in groups if len(g) >= 2]
+    if len(cols) < 2: return []
+    cols.sort(key=lambda c: sum(r.x0 for r in c) / len(c))
+    merged = []
+    for c in cols:
+        cx = sum(r.x0 for r in c) / len(c)
+        if merged and cx - merged[-1][1] <= pts(15):
+            merged[-1][0].extend(c)
+        else:
+            merged.append([c, cx])
+    distinct = [c for c, _ in merged if len(c) >= 2]
+    if len(distinct) < 2: return []
+    A, B = distinct[0], distinct[1]
+    out, used_b = [], [False] * len(B)
+    for la in A:
+        best_j, best_d = None, None
+        for j, lb in enumerate(B):
+            if used_b[j]: continue
+            d = abs((la.y0 + la.y1) / 2 - (lb.y0 + lb.y1) / 2)
+            if d > pts(6): continue
+            if best_d is None or d < best_d: best_j, best_d = j, d
+        if best_j is not None:
+            used_b[best_j] = True
+            out.append((la, B[best_j], mm(best_d)))
+    return out
 
 
 # ---------------------------------------------------------------- QR / barcode
@@ -568,6 +701,58 @@ def analyze(path, profile="offset_coated", opts=None):
                     dd = min(r.x0-trim.x0, r.y0-trim.y0, trim.x1-r.x1, trim.y1-r.y1)
                     add("safe_margin", "error", pno, r, f"{max(mm(dd),0):.1f} mm", f"{o['safe_mm']:.0f} mm",
                         key=round(r.x0)*1000+round(r.y0))
+
+        # 33: alignment / layout design-quality -- do things line up the way a professional
+        # design would (row-align across two columns, left-edge/column align in a stacked block,
+        # icon-to-label align, even spacing between stacked rows, centered elements actually
+        # centered). All Warning-only: this is a design-quality nudge, not a print defect.
+        if not sheet and not blank:
+            lines = _text_lines(blocks)
+            if lines:
+                stacks = _stacks(lines)
+                icons = _icon_candidates(drs, img_infos, trim)
+                for ic, ln in _icon_text_pairs(icons, lines):
+                    dy = mm(abs((ic.y0+ic.y1)/2 - (ln.y0+ln.y1)/2))
+                    if ALIGN_TOL_MM < dy <= ALIGN_NEARMISS_MM:
+                        r = ic | ln
+                        add("icon_text_misaligned", "warning", pno, r, f"{dy:.1f} mm", f"{ALIGN_TOL_MM} mm",
+                            key=round(r.x0)*1000+round(r.y0))
+                for la, lb, dy in _row_align_pairs(lines):
+                    if ALIGN_TOL_MM < dy <= ALIGN_NEARMISS_MM:
+                        r = la | lb
+                        add("row_misaligned", "warning", pno, r, f"{dy:.1f} mm", f"{ALIGN_TOL_MM} mm",
+                            key=round(r.x0)*1000+round(r.y0))
+                for stack in stacks:
+                    if len(stack) >= 3 and max(r.width for r in stack) < 0.6 * trim.width:
+                        x0s = [r.x0 for r in stack]
+                        spread = mm(max(x0s) - min(x0s))
+                        if ALIGN_TOL_MM < spread <= ALIGN_NEARMISS_MM:
+                            med = sorted(x0s)[len(x0s)//2]
+                            worst = max(stack, key=lambda r: abs(r.x0 - med))
+                            add("column_misaligned", "warning", pno, worst, f"{spread:.1f} mm", f"{ALIGN_TOL_MM} mm",
+                                key=round(worst.x0)*1000+round(worst.y0))
+                        gaps = [mm(stack[i+1].y0 - stack[i].y1) for i in range(len(stack)-1)]
+                        gaps = [g for g in gaps if g >= 0]
+                        if len(gaps) >= 2:
+                            mx_, mn_ = max(gaps), min(gaps)
+                            if mn_ > 0 and mx_ - mn_ > 1.0 and mx_ > 1.4 * mn_:
+                                r = stack[0] | stack[-1]
+                                add("uneven_spacing", "warning", pno, r, f"{mn_:.1f}-{mx_:.1f} mm", "",
+                                    key=round(r.x0)*1000+round(r.y0))
+                    # off-centre: a standalone title/logo or a whole stacked block that was
+                    # probably meant to sit centered (any size group, not just 3+ line stacks).
+                    # A minimum width excludes incidental small running elements (a page number,
+                    # a folio, a lone bullet) that happen to sit near the middle but were never
+                    # meant to be a "centered design element" in the business-card/letterhead sense.
+                    r = stack[0]
+                    for ln2 in stack[1:]: r |= ln2
+                    if mm(r.width) >= 10 and r.width < 0.7 * trim.width:
+                        ml, mr = mm(r.x0 - trim.x0), mm(trim.x1 - r.x1)
+                        if ml > 2 and mr > 2:
+                            diff = abs(ml - mr)
+                            if ALIGN_TOL_MM < diff <= 8.0 and max(ml, mr) / min(ml, mr) <= 2.5:
+                                add("off_center", "warning", pno, r, f"{diff:.1f} mm", f"{ALIGN_TOL_MM} mm",
+                                    key=round(r.x0)*1000+round(r.y0))
 
         # 14: thin lines   29: border close to the cutting edge
         for d in drs:
