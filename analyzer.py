@@ -15,7 +15,7 @@ PT_MM = 25.4 / 72.0
 def mm(pt): return pt * PT_MM
 def pts(m): return m / PT_MM
 
-DEFAULTS = {"bleed_mm": 5.0, "safe_mm": 5.0, "min_dpi_warn": 300, "min_dpi_err": 150,
+DEFAULTS = {"bleed_mm": 5.0, "safe_mm": 6.0, "min_dpi_warn": 300, "min_dpi_err": 150,
             "min_text_pt": 6.0, "min_line_pt": 0.25, "max_tac": 300, "expected_mm": None,
             "mode": "single",          # "single" or "sheet" (mixed-job sheet)
             "shape_cut": False,        # shape / die cutting job -> needs cut_overlap_mm
@@ -360,7 +360,7 @@ def analyze(path, profile="offset_coated", opts=None):
                             f"{o['min_text_pt']:.0f} pt", key=round(r.x0))
                     if not sheet and r.intersects(trim) and not inner.contains(r):
                         d = min(r.x0-trim.x0, r.y0-trim.y0, trim.x1-r.x1, trim.y1-r.y1)
-                        add("safe_margin", "warning", pno, r, f"{max(mm(d),0):.1f} mm", f"{o['safe_mm']:.0f} mm", key=round(r.x0)*1000+round(r.y0))
+                        add("safe_margin", "error", pno, r, f"{max(mm(d),0):.1f} mm", f"{o['safe_mm']:.0f} mm", key=round(r.x0)*1000+round(r.y0))
                     if sp.get("color") == 0xFFFFFF and sp["size"] < o["white_text_pt"] and A is not None:
                         bg = _crop(A, r + (-1, -1, 1, 1), s)
                         if bg.size and float(_darkness(bg).mean()) > 115:
@@ -381,6 +381,11 @@ def analyze(path, profile="offset_coated", opts=None):
             bb = fitz.Rect(info["bbox"])
             if bb.width < 1 or bb.height < 1: continue
             if (bb & trim).get_area() >= 0.8 * trim.get_area(): scan_like = True
+            # 11: safe margin -- a photo/logo placed close to the cutting edge, not a full-bleed background
+            if (not sheet and bb.get_area() < 0.85 * trim.get_area() and bb.intersects(trim) and not inner.contains(bb)):
+                d = min(bb.x0-trim.x0, bb.y0-trim.y0, trim.x1-bb.x1, trim.y1-bb.y1)
+                add("safe_margin", "error", pno, bb, f"{max(mm(d),0):.1f} mm", f"{o['safe_mm']:.0f} mm",
+                    key=round(bb.x0)*1000+round(bb.y0))
             dpi = min(info["width"] / (bb.width/72), info["height"] / (bb.height/72))
             fact["min_dpi"] = dpi if fact["min_dpi"] is None else min(fact["min_dpi"], dpi)
             xr = info.get("xref", 0)
@@ -413,11 +418,39 @@ def analyze(path, profile="offset_coated", opts=None):
         if scan_like and not has_vector_text and not blank:
             add("scanned_maybe_blurry", "confirm", pno, key="scan")
 
+        # 11: safe margin (vector shapes/logos) -- cluster touching/overlapping pieces first, so one
+        # multi-path logo near the edge gives ONE finding instead of one per path fragment
+        if not sheet:
+            min_elem = pts(2.0)   # ignore tiny path fragments/anti-alias noise below 2mm
+            cand = [fitz.Rect(d["rect"]) for d in drs
+                    if fitz.Rect(d["rect"]).width >= min_elem and fitz.Rect(d["rect"]).height >= min_elem
+                    and fitz.Rect(d["rect"]).get_area() < 0.85 * trim.get_area()]
+            pad = pts(3.0)
+            clusters, changed = cand, True
+            while changed and len(clusters) > 1:
+                changed = False
+                out, used = [], [False] * len(clusters)
+                for i in range(len(clusters)):
+                    if used[i]: continue
+                    cur = fitz.Rect(clusters[i]); used[i] = True
+                    for j in range(i + 1, len(clusters)):
+                        if used[j]: continue
+                        test = fitz.Rect(cur.x0 - pad, cur.y0 - pad, cur.x1 + pad, cur.y1 + pad)
+                        if test.intersects(clusters[j]):
+                            cur |= clusters[j]; used[j] = True; changed = True
+                    out.append(cur)
+                clusters = out
+            for r in clusters:
+                if r.get_area() < 0.85 * trim.get_area() and r.intersects(trim) and not inner.contains(r):
+                    dd = min(r.x0-trim.x0, r.y0-trim.y0, trim.x1-r.x1, trim.y1-r.y1)
+                    add("safe_margin", "error", pno, r, f"{max(mm(dd),0):.1f} mm", f"{o['safe_mm']:.0f} mm",
+                        key=round(r.x0)*1000+round(r.y0))
+
         # 14: thin lines   29: border close to the cutting edge
         for d in drs:
+            r = fitz.Rect(d["rect"])
             w_ = d.get("width")
             if "s" not in (d.get("type") or ""): continue
-            r = fitz.Rect(d["rect"])
             if d.get("stroke_opacity", 1) != 0 and w_ is not None and w_ < o["min_line_pt"]:
                 add("hairline", "warning", pno, r, f"{w_:.2f} pt", f"{o['min_line_pt']} pt", key=round(r.x0)*1000+round(r.y0))
             if (not sheet and len(d.get("items", [])) <= 8 and trim.contains(r)
