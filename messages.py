@@ -26,10 +26,10 @@ M = {
  "gu": ("RGB રંગ મળ્યો ({v}). પ્રિન્ટ માટે CMYK જોઈએ.", "એક્સપોર્ટ પહેલાં ફાઇલ CMYK માં બદલો."),
  "hinglish": ("RGB color mila ({v}). Print ke liye CMYK chahiye.", "Export se pehle file ko CMYK me convert karo.")},
 "low_dpi": {
- "en": ("Image resolution is {v} (needs {e}). It will print blurry.", "Use a higher-resolution original image."),
- "hi": ("इमेज रेज़ोल्यूशन {v} है ({e} चाहिए)। प्रिंट धुंधला आएगा।", "ज़्यादा रेज़ोल्यूशन वाली ओरिजिनल इमेज इस्तेमाल करें।"),
- "gu": ("ઇમેજ રિઝોલ્યુશન {v} છે ({e} જોઈએ). પ્રિન્ટ ઝાંખું આવશે.", "વધુ રિઝોલ્યુશનવાળી મૂળ ઇમેજ વાપરો."),
- "hinglish": ("Image resolution {v} hai ({e} chahiye). Print blur aayega.", "Zyada resolution wali original image use karo.")},
+ "en": ("Image resolution is {v} (needs {e}). It will print blurry.", "Use a higher-resolution original image. If several images have this issue, select them all together and convert/bitmap them to 300+ dpi in one go instead of doing each one separately."),
+ "hi": ("इमेज रेज़ोल्यूशन {v} है ({e} चाहिए)। प्रिंट धुंधला आएगा।", "ज़्यादा रेज़ोल्यूशन वाली ओरिजिनल इमेज इस्तेमाल करें। अगर कई इमेज में यह समस्या है, तो सभी को एक साथ सेलेक्ट करके एक बार में 300+ dpi पर बिटमैप/कन्वर्ट करें, एक-एक अलग करने की ज़रूरत नहीं।"),
+ "gu": ("ઇમેજ રિઝોલ્યુશન {v} છે ({e} જોઈએ). પ્રિન્ટ ઝાંખું આવશે.", "વધુ રિઝોલ્યુશનવાળી મૂળ ઇમેજ વાપરો. જો અનેક ઇમેજમાં આ સમસ્યા હોય, તો બધાને સાથે સિલેક્ટ કરીને એક જ વારમાં 300+ dpi પર બિટમેપ/કન્વર્ટ કરો, એક-એક અલગ કરવાની જરૂર નથી."),
+ "hinglish": ("Image resolution {v} hai ({e} chahiye). Print blur aayega.", "Zyada resolution wali original image use karo. Agar multiple images mein ye problem hai, to sabko ek saath select karke 300+ dpi pe ek baar mein bitmap/convert karo — ek-ek alag karne ki zaroorat nahi.")},
 "font_not_embedded": {
  "en": ("Font '{v}' is not embedded or converted. It may change on the printer's computer.", "Convert text to curves/outlines or embed all fonts."),
  "hi": ("फ़ॉन्ट '{v}' एम्बेड या कन्वर्ट नहीं है। प्रिंटर के कंप्यूटर पर बदल सकता है।", "टेक्स्ट को कर्व/आउटलाइन में बदलें या सभी फ़ॉन्ट एम्बेड करें।"),
