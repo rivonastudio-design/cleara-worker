@@ -6,10 +6,10 @@ M = {
  "gu": ("બ્લીડ {v} છે, {e} જોઈએ. બ્લીડ એટલે કટિંગ લાઇનની બહાર સુધી જતી વધારાની ડિઝાઇન. તેના વગર કટિંગ પછી કિનારે સફેદ પટ્ટી દેખાઈ શકે.", "બેકગ્રાઉન્ડ/ફોટોને દરેક બાજુ કટિંગ લાઇનથી {e} બહાર સુધી વધારો અને ફરી એક્સપોર્ટ કરો."),
  "hinglish": ("Bleed {v} hai, {e} chahiye. Bleed matlab cutting line ke bahar tak jaane wala extra design. Iske bina cutting ke baad kinare pe safed patti dikh sakti hai.", "Background/photo ko har taraf cutting line se {e} bahar tak badhao aur dobara export karo.")},
 "bleed_unknown": {
- "en": ("The design touches the edge, but the file does not say where the cutting line is. Please confirm bleed (extra design past the cutting line) is included.", "Check that the background goes 3 mm past the cutting line on every side."),
- "hi": ("डिज़ाइन किनारे तक है, पर फ़ाइल में कटिंग लाइन की जानकारी नहीं है। कृपया पुष्टि करें कि ब्लीड (कटिंग लाइन के बाहर का एक्स्ट्रा डिज़ाइन) शामिल है।", "जाँचें कि बैकग्राउंड हर तरफ़ कटिंग लाइन से 3 मिमी बाहर तक है।"),
- "gu": ("ડિઝાઇન કિનારા સુધી છે, પણ ફાઇલમાં કટિંગ લાઇનની માહિતી નથી. કૃપા કરી ખાતરી કરો કે બ્લીડ (કટિંગ લાઇનની બહારની વધારાની ડિઝાઇન) શામેલ છે.", "તપાસો કે બેકગ્રાઉન્ડ દરેક બાજુ કટિંગ લાઇનથી 3 મિમી બહાર સુધી છે."),
- "hinglish": ("Design kinare tak hai, par file me cutting line ki jaankari nahi hai. Confirm karo ki bleed (cutting line ke bahar ka extra design) rakha hai.", "Check karo ki background har taraf cutting line se 3 mm bahar tak hai.")},
+ "en": ("The design touches the edge, but the file does not say where the cutting line is. Please confirm bleed (extra design past the cutting line) is included.", "Check that the background goes {e} past the cutting line on every side."),
+ "hi": ("डिज़ाइन किनारे तक है, पर फ़ाइल में कटिंग लाइन की जानकारी नहीं है। कृपया पुष्टि करें कि ब्लीड (कटिंग लाइन के बाहर का एक्स्ट्रा डिज़ाइन) शामिल है।", "जाँचें कि बैकग्राउंड हर तरफ़ कटिंग लाइन से {e} बाहर तक है।"),
+ "gu": ("ડિઝાઇન કિનારા સુધી છે, પણ ફાઇલમાં કટિંગ લાઇનની માહિતી નથી. કૃપા કરી ખાતરી કરો કે બ્લીડ (કટિંગ લાઇનની બહારની વધારાની ડિઝાઇન) શામેલ છે.", "તપાસો કે બેકગ્રાઉન્ડ દરેક બાજુ કટિંગ લાઇનથી {e} બહાર સુધી છે."),
+ "hinglish": ("Design kinare tak hai, par file me cutting line ki jaankari nahi hai. Confirm karo ki bleed (cutting line ke bahar ka extra design) rakha hai.", "Check karo ki background har taraf cutting line se {e} bahar tak hai.")},
 "cut_overlap": {
  "en": ("Shape-cutting job: design goes only {v} past the cutting line, needs at least {e}. If the cut shifts even a little, the print will look bad.", "Extend the design at least {e} beyond the cutting line."),
  "hi": ("शेप कटिंग जॉब: डिज़ाइन कटिंग लाइन से सिर्फ़ {v} बाहर है, कम से कम {e} चाहिए। कटिंग थोड़ी भी हिली तो प्रिंट ख़राब दिखेगा।", "डिज़ाइन को कटिंग लाइन से कम से कम {e} बाहर तक बढ़ाएँ।"),

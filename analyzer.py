@@ -15,13 +15,13 @@ PT_MM = 25.4 / 72.0
 def mm(pt): return pt * PT_MM
 def pts(m): return m / PT_MM
 
-DEFAULTS = {"bleed_mm": 3.0, "safe_mm": 5.0, "min_dpi_warn": 300, "min_dpi_err": 150,
+DEFAULTS = {"bleed_mm": 5.0, "safe_mm": 5.0, "min_dpi_warn": 300, "min_dpi_err": 150,
             "min_text_pt": 5.0, "min_line_pt": 0.25, "max_tac": 300, "expected_mm": None,
             "mode": "single",          # "single" or "sheet" (mixed-job sheet)
             "shape_cut": False,        # shape / die cutting job -> needs cut_overlap_mm
             "single_colour": False,    # single-colour job -> mixed colours are an error
             "k_limit": 40,             # % black inside mixed colours / photos -> confirm
-            "cut_overlap_mm": 5.0, "max_paths": 8000, "white_text_pt": 8.0}
+            "cut_overlap_mm": 6.0, "max_paths": 8000, "white_text_pt": 8.0}
 CAP = 12            # max findings of one kind in a report
 PIXEL_PAGES = 60    # pages that get the ink (pixel) checks
 STREAM_LIMIT = 8_000_000
@@ -436,7 +436,7 @@ def analyze(path, profile="offset_coated", opts=None):
             touch = [k for k, v in inside.items() if v.size and float(v.mean()) >= 0.05]
             if touch:
                 if src == "none":
-                    add("bleed_unknown", "confirm", pno, key="bu")
+                    add("bleed_unknown", "confirm", pno, e=f"{need:.0f} mm", key="bu")
                 elif b < need - 0.2:
                     add(code, "error", pno, v=f"{max(b,0):.1f} mm", e=f"{need:.0f} mm", key="b")
                 else:
@@ -637,7 +637,7 @@ def analyze_image(path, profile="digital_toner", opts=None):
         ip = max(2, int(min(g.shape) * 0.012))
         edges = [inked[:, :ip], inked[:, -ip:], inked[:ip, :], inked[-ip:, :]]
         if any(float(v.mean()) >= 0.05 for v in edges):
-            add("bleed_unknown", "confirm")                 # design touches the edge of the picture
+            add("bleed_unknown", "confirm", "", f"{o['bleed_mm']:.0f} mm")  # design touches the edge of the picture
         if not inked.any():
             add("blank_page", "warning")
         elif inked.mean() >= 0.003 and float(np.percentile(g[inked], 5)) > 224:
