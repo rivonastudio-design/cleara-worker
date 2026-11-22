@@ -4,3 +4,4 @@ pillow
 pyspellchecker
 spylls
 numpy
+pyzbar

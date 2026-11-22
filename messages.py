@@ -115,6 +115,11 @@ M = {
  "hi": ("फ़ाइल साइज़ {v} है, पर चुना हुआ साइज़ {e} है।", "आर्टवर्क को चुने हुए साइज़ में बदलें।"),
  "gu": ("ફાઇલ સાઇઝ {v} છે, પણ પસંદ કરેલું સાઇઝ {e} છે.", "આર્ટવર્કને પસંદ કરેલા સાઇઝમાં બદલો."),
  "hinglish": ("File size {v} hai, par chuna hua size {e} hai.", "Artwork ko chuni hui size me badlo.")},
+"qr_barcode_found": {
+ "en": ("A {v} was found in this design. Print quality, size and contrast affect whether it will scan correctly -- this cannot be guaranteed from the file alone (recommended size: at least {e}).", "Print a sample copy and scan this code with a phone before printing the full batch."),
+ "hi": ("इस डिज़ाइन में {v} मिला। प्रिंट क्वालिटी, साइज़ और कंट्रास्ट पर निर्भर करता है कि यह स्कैन होगा या नहीं -- सिर्फ़ फ़ाइल देखकर यह पक्का नहीं कहा जा सकता (सुझाया गया साइज़: कम से कम {e})।", "पूरी प्रिंटिंग से पहले एक सैंपल कॉपी प्रिंट करके फ़ोन से इस कोड को स्कैन करके जाँच लें।"),
+ "gu": ("આ ડિઝાઇનમાં {v} મળ્યો. પ્રિન્ટ ક્વોલિટી, સાઇઝ અને કોન્ટ્રાસ્ટ પર આધાર રાખે છે કે તે સ્કેન થશે કે નહીં -- ફક્ત ફાઇલ જોઈને આ પાક્કું કહી શકાતું નથી (સૂચવેલ સાઇઝ: ઓછામાં ઓછું {e}).", "પૂરી પ્રિન્ટિંગ પહેલાં એક સેમ્પલ કોપી પ્રિન્ટ કરીને ફોનથી આ કોડને સ્કેન કરીને ચકાસો."),
+ "hinglish": ("Is design mein {v} mila. Print quality, size aur contrast pe depend karta hai ki ye scan hoga ya nahi -- sirf file dekhkar ye pakka nahi kaha ja sakta (recommended size: kam se kam {e}).", "Poori printing se pehle ek sample copy print karke phone se is code ko scan karke test kar lo.")},
 "page_size_mixed": {
  "en": ("Page {v} is a different size from page 1 ({e}).", "Make all pages the same size."),
  "hi": ("पेज {v} का साइज़ पेज 1 ({e}) से अलग है।", "सभी पेज एक ही साइज़ के रखें।"),

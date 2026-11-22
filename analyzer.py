@@ -11,6 +11,19 @@ import numpy as np
 import pymupdf as fitz
 from messages import build
 
+# QR/barcode detection (zbar) -- optional: if the system zbar library isn't present for any
+# reason, this check is simply skipped rather than crashing the whole analysis (same defensive
+# pattern as the Hindi spelling dictionary, which is also loaded lazily/optionally elsewhere).
+try:
+    from pyzbar.pyzbar import decode as _zbar_decode, ZBarSymbol as _ZBarSymbol
+    # every common commercial-print symbology except DATABAR/DATABAR_EXP: those two hit an
+    # internal zbar assertion bug on some unrelated dense patterns (prints a scary-looking but
+    # harmless warning to stderr) and are not a symbology Cleara's print jobs actually use
+    _ZBAR_SYMBOLS = [s for s in _ZBarSymbol if s.name not in
+                      ("NONE", "PARTIAL", "DATABAR", "DATABAR_EXP", "COMPOSITE", "SQCODE")]
+except Exception:
+    _zbar_decode = None
+
 PT_MM = 25.4 / 72.0
 def mm(pt): return pt * PT_MM
 def pts(m): return m / PT_MM
@@ -21,9 +34,11 @@ DEFAULTS = {"bleed_mm": 5.0, "safe_mm": 6.0, "min_dpi_warn": 300, "min_dpi_err":
             "shape_cut": False,        # shape / die cutting job -> needs cut_overlap_mm
             "single_colour": False,    # single-colour job -> mixed colours are an error
             "k_limit": 30,             # % black inside mixed colours / photos -> confirm
-            "cut_overlap_mm": 6.0, "max_paths": 8000, "white_text_pt": 8.0}
+            "cut_overlap_mm": 6.0, "max_paths": 8000, "white_text_pt": 8.0,
+            "qr_min_mm": 15.0}         # recommended minimum QR/barcode size for a reliable print scan
 CAP = 12            # max findings of one kind in a report
 PIXEL_PAGES = 60    # pages that get the ink (pixel) checks
+QR_BARCODE_PAGES = 20   # pages that get the QR/barcode scan (needs its own sharper render, costs more time)
 STREAM_LIMIT = 8_000_000
 
 
@@ -261,6 +276,28 @@ def _grid_check(islands, tol_pt):
     return is_grid, same_size, len(y0s), len(x0s)
 
 
+# ---------------------------------------------------------------- QR / barcode
+def _scan_codes(page):
+    """Render the page sharp enough for zbar to actually read a QR/barcode (the normal low-res
+    preview render used for ink checks is too soft for small codes -- tested and confirmed this
+    misses codes that a 300dpi render catches), then look for any QR/barcode on it.
+    Returns a list of (type_label, size_mm, bbox_in_page_points)."""
+    if _zbar_decode is None: return []
+    r = page.rect
+    scale = min(300 / 72.0, 3600 / max(r.width, r.height, 1))
+    pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+    from PIL import Image
+    im = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    out = []
+    for z in _zbar_decode(im, symbols=_ZBAR_SYMBOLS):
+        x, y, w, h = z.rect
+        size_mm = mm(max(w, h) / scale)
+        bbox = fitz.Rect(x / scale, y / scale, (x + w) / scale, (y + h) / scale)
+        label = "QR Code" if z.type == "QRCODE" else "Barcode"
+        out.append((label, size_mm, bbox))
+    return out
+
+
 # ---------------------------------------------------------------- pixel (ink) helpers
 def _cmyk(page, max_px=1400):
     r = page.rect
@@ -369,6 +406,14 @@ def analyze(path, profile="offset_coated", opts=None):
         # 18: too many loose vector elements
         if len(drs) > o["max_paths"]:
             add("not_bitmap_many", "error", pno, v=str(len(drs)), key="many")
+
+        # QR/barcode present -- can't guarantee a printed copy will scan, always ask for a scan test
+        if pno <= QR_BARCODE_PAGES:
+            try:
+                for label, size_mm, bb in _scan_codes(page):
+                    add("qr_barcode_found", "confirm", pno, bb, v=f"{label} ~{size_mm:.0f} mm",
+                        e=f"{o['qr_min_mm']:.0f} mm", key=f"{label}_{round(size_mm)}_{round(bb.x0)}")
+            except Exception: pass
 
         # drawing commands of the page
         try: ev = scan_stream(page.read_contents(), _gs_map(doc, page.xref))
@@ -782,6 +827,14 @@ def analyze_image(path, profile="digital_toner", opts=None):
         elif dpi < o["min_dpi_warn"] - 1: add("low_dpi", "warning", f"{dpi:.0f} dpi", f"{o['min_dpi_warn']} dpi")
     if im.mode not in ("CMYK", "L", "LA", "1"):
         add("rgb_color", "error", "image")
+    if _zbar_decode is not None:
+        try:
+            for z in _zbar_decode(im, symbols=_ZBAR_SYMBOLS):
+                label = "QR Code" if z.type == "QRCODE" else "Barcode"
+                # mm size only knowable if the client told us the printed size (size/preset selected)
+                v = f"{label} ~{max(z.rect.width, z.rect.height) / dpi * 25.4:.0f} mm" if ex else label
+                add("qr_barcode_found", "confirm", v, f"{o['qr_min_mm']:.0f} mm")
+        except Exception: pass
     try:
         small = im.copy(); small.thumbnail((500, 500))
         g = np.asarray(small.convert("L"), dtype=np.float32)
