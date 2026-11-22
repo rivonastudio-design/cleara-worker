@@ -962,6 +962,22 @@ def _pdf_image_pil(doc, xref):
     return Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
 
+def _severity_label(sev, idx):
+    """the number/letter shown on the marker dot and in the problem list, per owner's scheme
+    (22 Nov): Errors get plain numbers (1,2,3...), Warnings get letters (A,B,C...,Z,AA,AB...,
+    Excel-column style so it never runs out), Confirms get no label at all (empty dot)."""
+    if sev == "error":
+        return str(idx)
+    if sev == "warning":
+        s = ""
+        n = idx
+        while n > 0:
+            n, r = divmod(n - 1, 26)
+            s = chr(65 + r) + s
+        return s
+    return ""   # confirm -- intentionally blank, per owner's design
+
+
 def _pack(findings, fact, t0, corrupt=False):
     BIG = 10**9
     def sort_key(f):
@@ -974,8 +990,11 @@ def _pack(findings, fact, t0, corrupt=False):
         x0 = bb[0] if bb else BIG
         return (page, y0, x0)
     findings.sort(key=sort_key)
+    sev_counters = {"error": 0, "warning": 0, "confirm": 0}
     for i, f in enumerate(findings, start=1):
-        f["no"] = i          # fixed 1..N label. Always every number, 1 to the total count, never skipped or random.
+        f["no"] = i          # fixed 1..N label across ALL findings -- kept for internal/jump-link use.
+        sev_counters[f["severity"]] += 1
+        f["label"] = _severity_label(f["severity"], sev_counters[f["severity"]])   # what the UI shows on the dot: Error "1,2,3", Warning "A,B,C", Confirm "" (blank)
     e = sum(f["severity"] == "error" for f in findings)
     w = sum(f["severity"] == "warning" for f in findings)
     c = sum(f["severity"] == "confirm" for f in findings)
