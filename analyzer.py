@@ -197,6 +197,69 @@ def _marks(drs, trim):
 def _sheet_marks(drs):
     return len(_thin_lines(drs)) >= 8
 
+def _item_islands(drs, img_infos, blocks, trim):
+    """Group all page content (vector paths + images + text) into separate touching/overlapping
+    clusters -- on a ganged sheet, this recovers each individual item's own footprint, since items
+    are normally separated by a real gap (bleed + cut margin) while everything belonging to ONE
+    item (its own text, logo, photo) sits close together."""
+    cand = [fitz.Rect(d["rect"]) for d in drs if d["rect"].width >= 1 and d["rect"].height >= 1]
+    cand += [fitz.Rect(info["bbox"]) for info in img_infos if info["bbox"][2]-info["bbox"][0] >= 1]
+    for blk in blocks:
+        for ln in blk.get("lines", []):
+            for sp in ln["spans"]:
+                r = fitz.Rect(sp["bbox"])
+                if r.width >= 1 and r.height >= 1: cand.append(r)
+    cand = [r for r in cand if r.intersects(trim)]
+    pad = pts(2.0)   # merge pieces of the SAME item (gap < 2mm); real items on a sheet are spaced wider
+    clusters, changed = cand, True
+    while changed and len(clusters) > 1:
+        changed = False
+        out, used = [], [False] * len(clusters)
+        for i in range(len(clusters)):
+            if used[i]: continue
+            cur = fitz.Rect(clusters[i]); used[i] = True
+            for j in range(i + 1, len(clusters)):
+                if used[j]: continue
+                test = fitz.Rect(cur.x0 - pad, cur.y0 - pad, cur.x1 + pad, cur.y1 + pad)
+                if test.intersects(clusters[j]):
+                    cur |= clusters[j]; used[j] = True; changed = True
+            out.append(cur)
+        clusters = out
+    return [r for r in clusters if r.width >= pts(5) and r.height >= pts(5)]   # drop tiny noise islands
+
+def _grid_check(islands, tol_pt):
+    """For straight-knife cutting, items must sit in a complete row/column grid -- every column's
+    left edge lines up across every row, and every row's top edge lines up across every column, so
+    one continuous straight cut separates a whole row or column at once. Returns
+    (is_grid, same_size, rows, cols)."""
+    if len(islands) < 2:
+        return True, True, 1, len(islands)
+
+    def cluster_vals(vals):
+        vals = sorted(vals)
+        groups = []
+        for v in vals:
+            if groups and v - groups[-1][0] <= tol_pt:
+                groups[-1].append(v)
+            else:
+                groups.append([v])
+        return [sum(g) / len(g) for g in groups]
+
+    x0s, y0s = cluster_vals([r.x0 for r in islands]), cluster_vals([r.y0 for r in islands])
+
+    def idx(val, cvals):
+        return min(range(len(cvals)), key=lambda i: abs(cvals[i] - val))
+
+    cells = set()
+    for r in islands:
+        cells.add((idx(r.y0, y0s), idx(r.x0, x0s)))
+    is_grid = len(cells) == len(islands) == len(x0s) * len(y0s)
+
+    widths = [r.width for r in islands]
+    heights = [r.height for r in islands]
+    same_size = (max(widths) - min(widths) <= pts(2)) and (max(heights) - min(heights) <= pts(2))
+    return is_grid, same_size, len(y0s), len(x0s)
+
 
 # ---------------------------------------------------------------- pixel (ink) helpers
 def _cmyk(page, max_px=1400):
@@ -479,6 +542,16 @@ def analyze(path, profile="offset_coated", opts=None):
             if not _sheet_marks(drs) and not blank: add("sheet_marks_missing", "error", pno, key="sm")
         elif src == "inferred" and not marks and not blank:
             add("crop_marks", "confirm", pno, key="c")
+
+        # 21: straight-knife cutting needs a complete, aligned row/column grid of same-size items
+        if sheet and not blank:
+            islands = _item_islands(drs, img_infos, blocks, trim)
+            if len(islands) >= 2:
+                is_grid, same_size, rows, cols = _grid_check(islands, pts(2.0))
+                if not is_grid:
+                    add("sheet_not_grid", "warning", pno, v=str(len(islands)), key="grid")
+                elif not same_size:
+                    add("sheet_mixed_sizes", "warning", pno, v=str(len(islands)), key="mix")
 
         if T is None or not T.size or blank: continue
         H_, W_ = T.shape[:2]

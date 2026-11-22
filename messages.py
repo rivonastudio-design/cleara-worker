@@ -100,6 +100,16 @@ M = {
  "hi": ("मिक्स जॉब शीट में कटिंग मार्क्स/डिटेल नहीं हैं। कटिंग वाले को पता नहीं चलेगा कहाँ काटना है।", "शीट के हर जॉब के लिए कटिंग मार्क्स लगाएँ।"),
  "gu": ("મિક્સ જોબ શીટમાં કટિંગ માર્ક્સ/ડિટેલ નથી. કટિંગ કરનારને ખબર નહીં પડે ક્યાં કાપવું.", "શીટના દરેક જોબ માટે કટિંગ માર્ક્સ મૂકો."),
  "hinglish": ("Mix job sheet me cutting marks/details nahi hain. Cutting wale ko pata nahi chalega kahan kaatna hai.", "Sheet ke har job ke liye cutting marks lagao.")},
+"sheet_not_grid": {
+ "en": ("{v} items on this sheet are not lined up in a straight row/column grid. A straight-knife cutter can only make full straight cuts, so staggered items will not cut cleanly.", "Arrange every item on a straight row/column grid so each row and column lines up all the way across the sheet."),
+ "hi": ("इस शीट पर {v} आइटम सीधी row/column grid में नहीं हैं। सीधी चाकू (straight-knife) से सिर्फ़ पूरी सीधी कट लग सकती है, इसलिए टेढ़े-मेढ़े रखे आइटम सही नहीं कटेंगे।", "हर आइटम को सीधी row/column grid में रखें ताकि हर row और column पूरी शीट में सीधी लाइन में मिले।"),
+ "gu": ("આ શીટ પર {v} આઇટમ સીધી row/column ગ્રિડમાં નથી. સીધી ચપ્પુ (straight-knife) થી માત્ર પૂરો સીધો કટ થઈ શકે છે, એટલે ટેઢા-મેઢા રાખેલા આઇટમ બરાબર નહીં કપાય.", "દરેક આઇટમને સીધી row/column ગ્રિડમાં ગોઠવો જેથી દરેક row અને column પૂરી શીટમાં સીધી લાઇનમાં મળે."),
+ "hinglish": ("Is sheet pe {v} items seedhi row/column grid mein nahi hain. Seedhi chhuri (straight-knife) se sirf poori seedhi cut lag sakti hai, isliye tedhe-medhe rakhe items sahi nahi katenge.", "Har item ko seedhi row/column grid mein rakho taaki har row aur column poori sheet mein seedhi line mein mile.")},
+"sheet_mixed_sizes": {
+ "en": ("{v} items on this sheet are different sizes. Mixing sizes makes straight-knife cutting harder and more wasteful.", "Keep all items on this sheet the same size, or cut this batch separately."),
+ "hi": ("इस शीट पर {v} आइटम अलग-अलग साइज़ के हैं। साइज़ मिक्स होने से सीधी चाकू (straight-knife) से काटना मुश्किल और ज़्यादा बर्बादी वाला हो जाता है।", "शीट के सारे आइटम एक ही साइज़ के रखें, या इसे अलग से काटें।"),
+ "gu": ("આ શીટ પર {v} આઇટમ અલગ-અલગ સાઇઝના છે. સાઇઝ મિક્સ થવાથી સીધી ચપ્પુ (straight-knife) થી કાપવું મુશ્કેલ અને વધુ બગાડવાળું બને છે.", "શીટના બધા આઇટમ એક જ સાઇઝના રાખો, અથવા આને અલગથી કાપો."),
+ "hinglish": ("Is sheet pe {v} items alag-alag size ke hain. Size mix hone se seedhi chhuri (straight-knife) se kaatna mushkil aur zyada barbadi wala ho jata hai.", "Sheet ke saare items ek hi size ke rakho, ya ise alag se kaato.")},
 "size_mismatch": {
  "en": ("File size is {v}, but the selected size is {e}.", "Resize the artwork to the selected size."),
  "hi": ("फ़ाइल साइज़ {v} है, पर चुना हुआ साइज़ {e} है।", "आर्टवर्क को चुने हुए साइज़ में बदलें।"),
