@@ -394,8 +394,16 @@ def analyze(path, profile="offset_coated", opts=None):
                 add("safe_margin", "error", pno, bb, f"{max(mm(d),0):.1f} mm", f"{o['safe_mm']:.0f} mm",
                     key=round(bb.x0)*1000+round(bb.y0))
             dpi = min(info["width"] / (bb.width/72), info["height"] / (bb.height/72))
-            fact["min_dpi"] = dpi if fact["min_dpi"] is None else min(fact["min_dpi"], dpi)
             xr = info.get("xref", 0)
+            # a gradient/shading fill (no raster data at all) is reported by get_image_info() as a
+            # fake "image" with no xref, rasterised internally at exactly 1 pixel per PDF point --
+            # which always computes to dpi == 72.000 regardless of its actual size. A real embedded
+            # image landing on that exact value is not a realistic coincidence, so this is how we
+            # tell a vector gradient apart from an actual low-res photo -- without this check, every
+            # gradient in a design was wrongly getting "72 dpi, will print blurry" AND "RGB image,
+            # needs CMYK" on top of the correct not_bitmap_gradient finding it already gets elsewhere.
+            if xr == 0 and abs(dpi - 72.0) < 0.01: continue
+            fact["min_dpi"] = dpi if fact["min_dpi"] is None else min(fact["min_dpi"], dpi)
             pos = f"{xr}_{round(bb.x0)}_{round(bb.y0)}"   # same image reused at a different spot is a separate problem
             if dpi < o["min_dpi_err"]:
                 add("low_dpi", "error", pno, bb, f"{dpi:.0f} dpi", f"{o['min_dpi_warn']} dpi", key=pos)
