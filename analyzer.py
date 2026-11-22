@@ -20,7 +20,7 @@ DEFAULTS = {"bleed_mm": 5.0, "safe_mm": 5.0, "min_dpi_warn": 300, "min_dpi_err":
             "mode": "single",          # "single" or "sheet" (mixed-job sheet)
             "shape_cut": False,        # shape / die cutting job -> needs cut_overlap_mm
             "single_colour": False,    # single-colour job -> mixed colours are an error
-            "k_limit": 40,             # % black inside mixed colours / photos -> confirm
+            "k_limit": 30,             # % black inside mixed colours / photos -> confirm
             "cut_overlap_mm": 6.0, "max_paths": 8000, "white_text_pt": 8.0}
 CAP = 12            # max findings of one kind in a report
 PIXEL_PAGES = 60    # pages that get the ink (pixel) checks
