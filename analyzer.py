@@ -1000,8 +1000,26 @@ def _pack(findings, fact, t0, corrupt=False):
     c = sum(f["severity"] == "confirm" for f in findings)
     result = "error" if e else ("warning" if w else "ok")   # confirm items do not change the result
     ms = int((time.time()-t0)*1000)
+
+    # per-page status for the page-number buttons above the preview (report_ui_wishlist #8,
+    # 23 Nov): same rule as the overall result -- a page with an error is red, a page with only
+    # warnings is orange, a page with nothing or only confirm items is green. No page-count limit
+    # here -- this works the same whether the file has 1 page or 120.
+    pages_total = fact.get("pages") or 0
+    sev_by_page = {}
+    if pages_total and not corrupt:
+        for f in findings:
+            p = f.get("page")
+            if p is None: continue
+            if f["severity"] == "error":
+                sev_by_page[p] = "error"
+            elif f["severity"] == "warning" and sev_by_page.get(p) != "error":
+                sev_by_page[p] = "warning"
+    pages_status = [{"page": p, "status": sev_by_page.get(p, "ok")} for p in range(1, pages_total + 1)]
+
     return {"result": result, "corrupt": corrupt, "processing_ms": ms, "fact_sheet": fact,
-            "report": {"version": 2, "summary": {"errors": e, "warnings": w, "confirms": c, "result": result}, "findings": findings}}
+            "report": {"version": 2, "summary": {"errors": e, "warnings": w, "confirms": c, "result": result},
+                       "pages_status": pages_status, "findings": findings}}
 
 
 # ---------------------------------------------------------------- JPG / PNG

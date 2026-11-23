@@ -125,17 +125,21 @@ def analyze_full(path, profile="offset_coated", opts=None):
     findings = res["report"]["findings"] + extra
     return analyzer._pack(findings, res["fact_sheet"], t0)
 
-def render_previews(path, outdir, max_px=1800):
+def render_previews(path, outdir, max_px=1800, safety_cap=300):
     """bbox values are in PDF points; UI scales by px_w / w_pt.
     max_px/scale-cap/quality raised 22 Nov (owner's report_ui_wishlist #3: previews were looking
     blurry on normal letter/A4-size documents -- the old 1100px/80%-quality cap was fine for a
     small business card but clearly soft on a full page) -- a deliberate size/sharpness trade-off,
-    not a bug fix."""
+    not a bug fix.
+    Per-page cap removed 23 Nov (report_ui_wishlist #8): real jobs can run 50, 120+ pages
+    (catalogs/menus) with no fixed ceiling, so every real page now gets a preview. safety_cap
+    is only a technical guard against a corrupt/bogus file reporting an absurd page count --
+    it is far above any real business file, not a business limit."""
     out = []
     try:
         doc = fitz.open(path)
         for i, page in enumerate(doc, start=1):
-            if i > 12: break
+            if i > safety_cap: break
             r = page.rect; s = min(3.0, max_px / max(r.width, r.height))
             pix = page.get_pixmap(matrix=fitz.Matrix(s, s), alpha=False)
             fn = os.path.join(outdir, f"p{i}.jpg"); pix.save(fn, jpg_quality=90)
