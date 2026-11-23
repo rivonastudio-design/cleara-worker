@@ -125,26 +125,30 @@ def analyze_full(path, profile="offset_coated", opts=None):
     findings = res["report"]["findings"] + extra
     return analyzer._pack(findings, res["fact_sheet"], t0)
 
-def render_previews(path, outdir, max_px=1100):
-    """bbox values are in PDF points; UI scales by px_w / w_pt."""
+def render_previews(path, outdir, max_px=1800):
+    """bbox values are in PDF points; UI scales by px_w / w_pt.
+    max_px/scale-cap/quality raised 22 Nov (owner's report_ui_wishlist #3: previews were looking
+    blurry on normal letter/A4-size documents -- the old 1100px/80%-quality cap was fine for a
+    small business card but clearly soft on a full page) -- a deliberate size/sharpness trade-off,
+    not a bug fix."""
     out = []
     try:
         doc = fitz.open(path)
         for i, page in enumerate(doc, start=1):
             if i > 12: break
-            r = page.rect; s = min(2.0, max_px / max(r.width, r.height))
+            r = page.rect; s = min(3.0, max_px / max(r.width, r.height))
             pix = page.get_pixmap(matrix=fitz.Matrix(s, s), alpha=False)
-            fn = os.path.join(outdir, f"p{i}.jpg"); pix.save(fn, jpg_quality=80)
+            fn = os.path.join(outdir, f"p{i}.jpg"); pix.save(fn, jpg_quality=90)
             out.append({"page": i, "file": fn, "w_pt": round(r.width, 2), "h_pt": round(r.height, 2), "px_w": pix.width, "px_h": pix.height})
     except Exception:
         pass
     return out
 
-def image_preview(path, outdir, max_px=1100):
+def image_preview(path, outdir, max_px=1800):
     from PIL import Image
     try:
         im = Image.open(path).convert("RGB"); im.thumbnail((max_px, max_px))
-        fn = os.path.join(outdir, "p1.jpg"); im.save(fn, quality=80)
+        fn = os.path.join(outdir, "p1.jpg"); im.save(fn, quality=90)
         return [{"page": 1, "file": fn, "w_pt": im.width, "h_pt": im.height, "px_w": im.width, "px_h": im.height}]
     except Exception:
         return []
