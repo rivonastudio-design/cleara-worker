@@ -23,17 +23,26 @@ SPELL_MSG_HI = {
 }
 _SPELL = None
 _SPELL_HI = None
+_SPELL_GU = None
 _DEVANAGARI = re.compile(r"[ऀ-ॿ]{2,}")
+_GUJARATI = re.compile(r"[઀-૿]{2,}")
 # the hi_IN Hunspell dictionary is missing a handful of very common greeting-card plural
 # forms (a narrow affix-rule gap, not a general quality problem -- most vocabulary tested
 # fine). These are correctly-spelled, everyday Hindi words -- never flag them.
 _HINDI_ALLOWLIST = {"शुभकामनाएं", "शुभकामनाएँ", "शुभकामनायें", "बधाईयां", "बधाइयां"}
+# the gu_IN Hunspell dictionary (LibreOffice/Utkarsh wordlist) is a classical word list with no
+# affix rules -- it is missing common modern/loanwords that show up constantly on real printing
+# jobs (business, tech, greeting-card terms). Checked ~20 everyday words by hand before building
+# this check; these are correctly-spelled, everyday Gujarati words -- never flag them.
+_GUJARATI_ALLOWLIST = {
+    "પેજ", "કલર", "પ્રિન્ટિંગ", "ઓફર", "વેબસાઇટ", "બ્રોશર", "ઓનલાઇન", "ઇમેઇલ", "વોટ્સએપ",
+}
 
 def _finding(code, sev, page, bbox, v, e):
     if code == "spelling":
         msg = {l: SPELL_MSG[l][0].format(v=v, e=e) for l in LANGS}
         fix = {l: SPELL_MSG[l][1] for l in LANGS}
-    elif code == "spelling_hi":
+    elif code == "spelling_hi" or code == "spelling_gu":
         code = "spelling"   # same finding type/UI, just a different message template
         msg = {l: SPELL_MSG_HI[l][0].format(v=v) for l in LANGS}
         fix = {l: SPELL_MSG_HI[l][1] for l in LANGS}
@@ -108,6 +117,43 @@ def _spelling_hindi(doc):
                 if len(out) >= 8: return out
     return out
 
+def _gu_dict():
+    """Loaded once per worker process and cached -- never on a file that has no Gujarati text
+    at all, so English/Hindi-only jobs pay nothing extra."""
+    global _SPELL_GU
+    if _SPELL_GU is None:
+        from spylls.hunspell import Dictionary
+        base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dict", "gu_IN")
+        _SPELL_GU = Dictionary.from_files(base)
+    return _SPELL_GU
+
+def _spelling_gujarati(doc):
+    """Gujarati only, confirm-level, same spirit as _spelling_hindi() above. No upper/lower-case
+    signal exists in Gujarati script either, so this relies only on "is it in the dictionary" and
+    skips a whole page if too much of it is unknown (probably not clean Gujarati, or a page full
+    of proper nouns/addresses)."""
+    full_text = "".join(page.get_text() for page in doc)
+    if not _GUJARATI.search(full_text): return []   # no Gujarati text at all -- skip, don't even load the dictionary
+    d = _gu_dict()
+    out, seen = [], set()
+    for pno, page in enumerate(doc, start=1):
+        spans = [sp for blk in page.get_text("dict")["blocks"] for ln in blk.get("lines", []) for sp in ln["spans"]]
+        words = {w for sp in spans for w in _GUJARATI.findall(sp["text"])}
+        if words:
+            unknown = sum(1 for w in words if w not in _GUJARATI_ALLOWLIST and not d.lookup(w))
+            if len(words) >= 6 and unknown / len(words) > 0.35: continue   # not clean Gujarati / mostly names on this page
+        for sp in spans:
+            for w in _GUJARATI.findall(sp["text"]):
+                if w in seen or w in _GUJARATI_ALLOWLIST or d.lookup(w): continue
+                # same reasoning as Hindi: Hunspell's top "correction" is unreliable for this
+                # script, so only require that *some* suggestion exists (a weak signal this is a
+                # real near-miss typo, not a name or garbled text with nothing close in the dict).
+                if not list(d.suggest(w)): continue
+                seen.add(w)
+                out.append(_finding("spelling_gu", "confirm", pno, fitz.Rect(sp["bbox"]), w, ""))
+                if len(out) >= 8: return out
+    return out
+
 def analyze_full(path, profile="offset_coated", opts=None):
     t0 = time.time()
     res = analyze(path, profile, opts)
@@ -119,6 +165,10 @@ def analyze_full(path, profile="offset_coated", opts=None):
         pass
     try:
         extra += _spelling_hindi(fitz.open(path))
+    except Exception:
+        pass
+    try:
+        extra += _spelling_gujarati(fitz.open(path))
     except Exception:
         pass
     if not extra: return res
