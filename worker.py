@@ -1,8 +1,10 @@
 """Cleara worker: polls Supabase for queued jobs, analyzes PDFs, writes report back."""
 import os, sys, time, tempfile, traceback
 import requests
+import analyzer
 from engine import analyze_full, analyze_image, render_previews, image_preview
 from messages import build as build_msg
+from fixes import apply_fix, resolved_codes
 
 
 def _crash_report():
@@ -50,6 +52,35 @@ class Sb:
         if path.startswith("uploads/"): path = path[len("uploads/"):]
         r = requests.get(f"{self.url}/storage/v1/object/uploads/{path}", headers=self.h, timeout=120)
         r.raise_for_status(); open(dest, "wb").write(r.content)
+
+    # -------- Auto-Fix (added 27 Nov) --------
+    def get_job(self, jid):
+        r = requests.get(f"{self.url}/rest/v1/jobs", headers=self.h, timeout=30, params={"id": f"eq.{jid}", "select": "*"})
+        r.raise_for_status(); j = r.json(); return j[0] if j else None
+    def queued_fixes(self, n=5):
+        r = requests.get(f"{self.url}/rest/v1/fix_requests", headers=self.h, timeout=30,
+            params={"status": "eq.queued", "order": "created_at.asc", "limit": n, "select": "*"})
+        r.raise_for_status(); return r.json()
+    def applying_fixes(self, n=5):
+        r = requests.get(f"{self.url}/rest/v1/fix_requests", headers=self.h, timeout=30,
+            params={"status": "eq.applying", "order": "updated_at.asc", "limit": n, "select": "*"})
+        r.raise_for_status(); return r.json()
+    def claim_fix(self, fid, from_status, to_status):  # atomic: only succeeds if still in from_status
+        r = requests.patch(f"{self.url}/rest/v1/fix_requests", headers={**self.h, "Prefer": "return=representation"}, timeout=30,
+            params={"id": f"eq.{fid}", "status": f"eq.{from_status}"}, json={"status": to_status})
+        r.raise_for_status(); return bool(r.json())
+    def update_fix(self, fid, data):
+        r = requests.patch(f"{self.url}/rest/v1/fix_requests", headers=self.h, timeout=30, params={"id": f"eq.{fid}"}, json=data)
+        r.raise_for_status()
+    def upload_report_file(self, path, fn):
+        h = {**self.h, "Content-Type": "application/pdf", "x-upsert": "true"}
+        r = requests.post(f"{self.url}/storage/v1/object/reports/{path}", headers=h, data=open(fn, "rb").read(), timeout=120)
+        r.raise_for_status()
+    def rpc(self, fn, params):
+        r = requests.post(f"{self.url}/rest/v1/rpc/{fn}", headers=self.h, timeout=30, json=params)
+        r.raise_for_status()
+        try: return r.json()
+        except Exception: return None
 
 def mark_findings(findings, previews):
     """Attach a marker (% position on that page's preview picture) to every finding that
@@ -120,6 +151,85 @@ def process(sb, job):
         except Exception: pass
         print("FAILED")
 
+def process_fix_generate(sb, fr):
+    """Auto-Fix step 1 (added 27 Nov). fr is a fix_requests row with status='queued' (client
+    tapped 'Fix this', no credit charged yet -- preview is free). Downloads the job's original
+    file, runs the Ghostscript transform for fr['fix_type'], renders an 'after' preview for only
+    the pages that had this finding, uploads both, and moves the row to preview_ready so the
+    client can see before/after. Any failure marks the row failed with a reason (nothing to
+    refund yet at this step, since no credit was charged)."""
+    fid = fr["id"]
+    if not sb.claim_fix(fid, "queued", "generating"): return
+    print(f"[fix {fid}] {fr['fix_type']} generating ...", end=" ", flush=True)
+    try:
+        job = sb.get_job(fr["job_id"])
+        if not job: raise RuntimeError("job not found")
+        codes = resolved_codes(fr["fix_type"])
+        findings = (job.get("report") or {}).get("findings") or []
+        affected_pages = sorted({f["page"] for f in findings if f.get("code") in codes and f.get("page")})
+        with tempfile.TemporaryDirectory() as td:
+            ft = str(job.get("file_type") or "pdf").lower()
+            in_path = os.path.join(td, "in." + ft)
+            sb.download(job["file_path"], in_path)
+            out_path = os.path.join(td, "fixed.pdf")
+            apply_fix(fr["fix_type"], in_path, out_path)
+            report_path = f"{fr['agency_id']}/{fr['job_id']}/fixed_{fr['fix_type']}.pdf"
+            sb.upload_report_file(report_path, out_path)
+            pv = render_previews(out_path, td, pages=affected_pages or None)
+            after = []
+            for x in pv:
+                ppath = f"{fr['agency_id']}/{fr['job_id']}/fix_{fr['fix_type']}_after_p{x['page']}.jpg"
+                sb.upload_preview(ppath, x["file"])
+                after.append({"page": x["page"], "path": ppath, "w_pt": x["w_pt"], "h_pt": x["h_pt"],
+                              "px_w": x["px_w"], "px_h": x["px_h"]})
+        sb.update_fix(fid, {"status": "preview_ready", "after_preview": after, "fixed_file_path": report_path})
+        print("ok")
+    except Exception as e:
+        traceback.print_exc()
+        try: sb.update_fix(fid, {"status": "failed", "error_message": str(e)[:500]})
+        except Exception: pass
+        print("FAILED")
+
+def process_fix_finalize(sb, fr):
+    """Auto-Fix step 2 (added 27 Nov). fr is a fix_requests row with status='applying' -- the
+    client already chose 'After' and request_fix_apply() already charged 1 credit. Takes the
+    job's existing report, drops every finding whose code this fix resolves, re-packs the
+    report (same analyzer._pack used for fresh jobs, so numbering/labels/summary/pages_status
+    stay consistent), swaps in the already-generated after-preview images for the affected
+    pages, and writes it all back onto the job row so the client sees an updated report. On any
+    failure, refunds the credit via fix_request_refund() so the client isn't charged for a fix
+    that didn't actually land."""
+    fid = fr["id"]
+    if not sb.claim_fix(fid, "applying", "finalizing"): return
+    print(f"[fix {fid}] {fr['fix_type']} finalizing ...", end=" ", flush=True)
+    try:
+        job = sb.get_job(fr["job_id"])
+        if not job: raise RuntimeError("job not found")
+        codes = resolved_codes(fr["fix_type"])
+        report = job.get("report") or {}
+        fact = job.get("fact_sheet") or {}
+        remaining = [f for f in (report.get("findings") or []) if f.get("code") not in codes]
+        packed = analyzer._pack(remaining, fact, time.time())
+        new_report = packed["report"]
+        by_page = {p["page"]: p for p in (fr.get("after_preview") or [])}
+        previews = fact.get("previews") or []
+        for p in previews:
+            if p.get("page") in by_page:
+                p.update({k: v for k, v in by_page[p["page"]].items() if k != "page"})
+        mark_findings(new_report["findings"], previews)
+        fact["previews"] = previews
+        sb.update(fr["job_id"], {"report": new_report, "fact_sheet": fact, "result": new_report["summary"]["result"],
+                                  "review_flag": new_report["summary"]["confirms"] > 0})
+        sb.update_fix(fid, {"status": "applied"})
+        print("ok")
+    except Exception as e:
+        traceback.print_exc()
+        try:
+            sb.rpc("fix_request_refund", {"p_fix_request_id": fid})
+            sb.update_fix(fid, {"status": "failed", "error_message": str(e)[:500]})
+        except Exception: pass
+        print("FAILED")
+
 def main():
     load_env()
     url, key = os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
@@ -128,6 +238,8 @@ def main():
     while True:
         try:
             for job in sb.queued(): process(sb, job)
+            for fr in sb.queued_fixes(): process_fix_generate(sb, fr)
+            for fr in sb.applying_fixes(): process_fix_finalize(sb, fr)
         except Exception as e:
             print("poll error:", e)
         time.sleep(int(os.environ.get("POLL_SECONDS", "5")))
