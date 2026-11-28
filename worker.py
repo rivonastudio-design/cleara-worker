@@ -4,7 +4,7 @@ import requests
 import analyzer
 from engine import analyze_full, analyze_image, render_previews, image_preview
 from messages import build as build_msg
-from fixes import apply_fix, resolved_codes
+from fixes import apply_fix, resolved_codes, RENUMBERING_FIXES
 
 
 def _crash_report():
@@ -152,33 +152,46 @@ def process(sb, job):
         print("FAILED")
 
 def process_fix_generate(sb, fr):
-    """Auto-Fix step 1 (added 27 Nov). fr is a fix_requests row with status='queued' (client
-    tapped 'Fix this', no credit charged yet -- preview is free). Downloads the job's original
-    file, runs the Ghostscript transform for fr['fix_type'], renders an 'after' preview for only
-    the pages that had this finding, uploads both, and moves the row to preview_ready so the
-    client can see before/after. Any failure marks the row failed with a reason (nothing to
-    refund yet at this step, since no credit was charged)."""
+    """Auto-Fix step 1 (added 27 Nov, extended 28 Nov for 4 more fix types). fr is a
+    fix_requests row with status='queued' (client tapped 'Fix this', no credit charged yet --
+    preview is free). Downloads the job's original file, runs the transform for fr['fix_type']
+    (fixes.py -- either a Ghostscript pass or a PyMuPDF content edit), renders an 'after'
+    preview, uploads both, and moves the row to preview_ready so the client can see
+    before/after. Any failure marks the row failed with a reason (nothing to refund yet at
+    this step, since no credit was charged).
+
+    For most fix types the preview only needs the pages that had the finding. remove_blank_pages
+    is different -- it changes the page count, so every page shifts; the preview renders the
+    WHOLE new document instead (RENUMBERING_FIXES), and add_crop_marks additionally needs the
+    job's preset size (the same trim-box info analyzer used to decide the page qualifies)."""
     fid = fr["id"]
     if not sb.claim_fix(fid, "queued", "generating"): return
     print(f"[fix {fid}] {fr['fix_type']} generating ...", end=" ", flush=True)
     try:
         job = sb.get_job(fr["job_id"])
         if not job: raise RuntimeError("job not found")
-        codes = resolved_codes(fr["fix_type"])
+        fix_type = fr["fix_type"]
+        codes = resolved_codes(fix_type)
         findings = (job.get("report") or {}).get("findings") or []
         affected_pages = sorted({f["page"] for f in findings if f.get("code") in codes and f.get("page")})
+        context = {"pages": affected_pages}
+        if fix_type == "add_crop_marks":
+            pr = sb.preset(job.get("preset_id"))
+            if not pr: raise RuntimeError("job has no preset -- can't know the trim size for crop marks")
+            context["width_mm"] = float(pr["width_mm"]); context["height_mm"] = float(pr["height_mm"])
         with tempfile.TemporaryDirectory() as td:
             ft = str(job.get("file_type") or "pdf").lower()
             in_path = os.path.join(td, "in." + ft)
             sb.download(job["file_path"], in_path)
             out_path = os.path.join(td, "fixed.pdf")
-            apply_fix(fr["fix_type"], in_path, out_path)
-            report_path = f"{fr['agency_id']}/{fr['job_id']}/fixed_{fr['fix_type']}.pdf"
+            apply_fix(fix_type, in_path, out_path, context=context)
+            report_path = f"{fr['agency_id']}/{fr['job_id']}/fixed_{fix_type}.pdf"
             sb.upload_report_file(report_path, out_path)
-            pv = render_previews(out_path, td, pages=affected_pages or None)
+            preview_pages = None if fix_type in RENUMBERING_FIXES else (affected_pages or None)
+            pv = render_previews(out_path, td, pages=preview_pages)
             after = []
             for x in pv:
-                ppath = f"{fr['agency_id']}/{fr['job_id']}/fix_{fr['fix_type']}_after_p{x['page']}.jpg"
+                ppath = f"{fr['agency_id']}/{fr['job_id']}/fix_{fix_type}_after_p{x['page']}.jpg"
                 sb.upload_preview(ppath, x["file"])
                 after.append({"page": x["page"], "path": ppath, "w_pt": x["w_pt"], "h_pt": x["h_pt"],
                               "px_w": x["px_w"], "px_h": x["px_h"]})
@@ -191,33 +204,61 @@ def process_fix_generate(sb, fr):
         print("FAILED")
 
 def process_fix_finalize(sb, fr):
-    """Auto-Fix step 2 (added 27 Nov). fr is a fix_requests row with status='applying' -- the
-    client already chose 'After' and request_fix_apply() already charged 1 credit. Takes the
-    job's existing report, drops every finding whose code this fix resolves, re-packs the
-    report (same analyzer._pack used for fresh jobs, so numbering/labels/summary/pages_status
-    stay consistent), swaps in the already-generated after-preview images for the affected
-    pages, and writes it all back onto the job row so the client sees an updated report. On any
-    failure, refunds the credit via fix_request_refund() so the client isn't charged for a fix
-    that didn't actually land."""
+    """Auto-Fix step 2 (added 27 Nov, extended 28 Nov). fr is a fix_requests row with
+    status='applying' -- the client already chose 'After' and request_fix_apply() already
+    charged 1 credit. Takes the job's existing report, drops every finding whose code this
+    fix resolves, re-packs the report (same analyzer._pack used for fresh jobs, so
+    numbering/labels/summary/pages_status stay consistent), swaps in the already-generated
+    after-preview images, and writes it all back onto the job row so the client sees an
+    updated report. On any failure, refunds the credit via fix_request_refund() so the client
+    isn't charged for a fix that didn't actually land.
+
+    remove_blank_pages is the one fix that changes the page count (RENUMBERING_FIXES): every
+    remaining finding's page number has to shift down by however many deleted pages came
+    before it, findings that were ON a deleted page are dropped (that page no longer exists),
+    fact_sheet.pages shrinks, and the previews array is replaced wholesale with the
+    already-rendered after_preview (which covered the WHOLE new document, not just specific
+    pages, since old page numbers don't line up with the new ones)."""
     fid = fr["id"]
     if not sb.claim_fix(fid, "applying", "finalizing"): return
     print(f"[fix {fid}] {fr['fix_type']} finalizing ...", end=" ", flush=True)
     try:
         job = sb.get_job(fr["job_id"])
         if not job: raise RuntimeError("job not found")
-        codes = resolved_codes(fr["fix_type"])
+        fix_type = fr["fix_type"]
+        codes = resolved_codes(fix_type)
         report = job.get("report") or {}
-        fact = job.get("fact_sheet") or {}
-        remaining = [f for f in (report.get("findings") or []) if f.get("code") not in codes]
+        fact = dict(job.get("fact_sheet") or {})
+        old_findings = report.get("findings") or []
+
+        if fix_type in RENUMBERING_FIXES:
+            deleted_pages = sorted({f["page"] for f in old_findings if f.get("code") in codes and f.get("page")})
+            def remap(p):
+                if p is None: return None
+                return p - sum(1 for d in deleted_pages if d < p)
+            remaining = []
+            for f in old_findings:
+                if f.get("code") in codes or f.get("page") in deleted_pages:
+                    continue  # the resolved finding itself, or anything on a now-deleted page
+                f = dict(f); f["page"] = remap(f.get("page")); remaining.append(f)
+            if fact.get("pages"):
+                fact["pages"] = max(0, fact["pages"] - len(deleted_pages))
+            fact["previews"] = fr.get("after_preview") or []
+        else:
+            remaining = [f for f in old_findings if f.get("code") not in codes]
+
         packed = analyzer._pack(remaining, fact, time.time())
         new_report = packed["report"]
-        by_page = {p["page"]: p for p in (fr.get("after_preview") or [])}
-        previews = fact.get("previews") or []
-        for p in previews:
-            if p.get("page") in by_page:
-                p.update({k: v for k, v in by_page[p["page"]].items() if k != "page"})
-        mark_findings(new_report["findings"], previews)
-        fact["previews"] = previews
+
+        if fix_type not in RENUMBERING_FIXES:
+            by_page = {p["page"]: p for p in (fr.get("after_preview") or [])}
+            previews = fact.get("previews") or []
+            for p in previews:
+                if p.get("page") in by_page:
+                    p.update({k: v for k, v in by_page[p["page"]].items() if k != "page"})
+            fact["previews"] = previews
+        mark_findings(new_report["findings"], fact["previews"])
+
         sb.update(fr["job_id"], {"report": new_report, "fact_sheet": fact, "result": new_report["summary"]["result"],
                                   "review_flag": new_report["summary"]["confirms"] > 0})
         sb.update_fix(fid, {"status": "applied"})
